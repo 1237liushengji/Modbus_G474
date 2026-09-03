@@ -48,6 +48,7 @@ static volatile uint32_t s_last_byte_us = 0U;
 
 static comm_stats_t s_stats;
 static mb_master_result_t s_result;
+static uint16_t s_consec_fails = 0U;
 
 /*====================================================================*/
 /* Init / accessors                                                    */
@@ -87,6 +88,22 @@ void MB_Master_OnRxByte(uint8_t byte, uint32_t now_us)
 uint8_t MB_Master_IsBusy(void)
 {
     return (s_state != MASTER_IDLE) ? 1U : 0U;
+}
+
+uint8_t MB_Master_CommOk(void)
+{
+    return (s_consec_fails == 0U) ? 1U : 0U;
+}
+
+uint16_t MB_Master_GetConsecutiveFails(void)
+{
+    return s_consec_fails;
+}
+
+void MB_Master_SetTiming(uint32_t timeout_ms, uint8_t retry_max)
+{
+    s_timeout_us = timeout_ms * 1000U;
+    s_retry_max = retry_max;
 }
 
 const mb_master_result_t *MB_Master_GetResult(void)
@@ -256,12 +273,13 @@ static void Master_HandleResponse(void)
     /* valid frame */
     if ((s_rx_buf[1] & 0x80U) != 0U)
     {
-        /* exception response */
+        /* exception response: link works, task failed */
         s_result.ok = 0U;
         s_result.exception = (uint8_t)(s_rx_buf[2] & 0xFFU);
         s_result.timed_out = 0U;
         s_result.payload_len = 0U;
         s_stats.exception_count++;
+        s_consec_fails = 0U;   /* slave answered -> link is healthy */
         s_state = MASTER_IDLE;
         return;
     }
@@ -292,6 +310,7 @@ static void Master_HandleResponse(void)
     s_result.exception = 0U;
     s_result.timed_out = 0U;
     s_stats.rx_count++;
+    s_consec_fails = 0U;
     s_state = MASTER_IDLE;
 }
 
@@ -341,6 +360,7 @@ uint8_t MB_Master_Poll(uint32_t now_us)
                     s_result.exception = 0U;
                     s_result.timed_out = 1U;
                     s_result.payload_len = 0U;
+                    s_consec_fails++;
                     s_state = MASTER_IDLE;
                     finished = 1U;
                 }

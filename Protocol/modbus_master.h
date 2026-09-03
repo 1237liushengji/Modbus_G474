@@ -64,6 +64,15 @@ const mb_master_result_t *MB_Master_GetResult(void);
 /** True while a transaction is in flight. */
 uint8_t MB_Master_IsBusy(void);
 
+/** 1 when the last transaction succeeded, 0 otherwise (comm fault flag). */
+uint8_t MB_Master_CommOk(void);
+
+/** Number of consecutive failures (reset on success). */
+uint16_t MB_Master_GetConsecutiveFails(void);
+
+/** Runtime tuning of timeout / retry. */
+void MB_Master_SetTiming(uint32_t timeout_ms, uint8_t retry_max);
+
 /*====================================================================*/
 /* Request builders (async; results come via Poll/GetResult)           */
 /*====================================================================*/
