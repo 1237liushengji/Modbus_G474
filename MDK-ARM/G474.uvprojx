@@ -339,7 +339,7 @@
               <MiscControls></MiscControls>
               <Define>USE_HAL_DRIVER,STM32G474xx</Define>
               <Undefine></Undefine>
-              <IncludePath>../Core/Inc;../Drivers/STM32G4xx_HAL_Driver/Inc;../Drivers/STM32G4xx_HAL_Driver/Inc/Legacy;../Drivers/CMSIS/Device/ST/STM32G4xx/Include;../Drivers/CMSIS/Include;..\Drivers\User\Inc;..\BSP;..\Common;..\Protocol</IncludePath>
+              <IncludePath>../Core/Inc;../Drivers/STM32G4xx_HAL_Driver/Inc;../Drivers/STM32G4xx_HAL_Driver/Inc/Legacy;../Drivers/CMSIS/Device/ST/STM32G4xx/Include;../Drivers/CMSIS/Include;..\Drivers\User\Inc;..\BSP;..\Common;..\Protocol;..\Master;..\Slave</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -552,6 +552,26 @@
               <FileName>modbus_slave.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\Protocol\modbus_slave.c</FilePath>
+            </File>
+            <File>
+              <FileName>modbus_master.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Protocol\modbus_master.c</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>Modbus/Role</GroupName>
+          <Files>
+            <File>
+              <FileName>master_main.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Master\master_main.c</FilePath>
+            </File>
+            <File>
+              <FileName>slave_main.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Slave\slave_main.c</FilePath>
             </File>
           </Files>
         </Group>
