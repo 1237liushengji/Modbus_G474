@@ -17,6 +17,7 @@
 #define __MODBUS_SLAVE_H
 
 #include <stdint.h>
+#include "types.h"   /* comm_stats_t */
 
 /** Response/exception transmitter (set by application, e.g. RS485_SendFrame) */
 typedef void (*mb_slave_tx_func_t)(const uint8_t *data, uint16_t len);
@@ -50,5 +51,8 @@ uint8_t MB_Slave_Poll(uint32_t now_us);
 
 /** Number of bytes currently buffered (debug). */
 uint16_t MB_Slave_GetRxLen(void);
+
+/** Snapshot of local comm statistics (exceptions counted too). */
+void MB_Slave_GetStats(comm_stats_t *out);
 
 #endif /* __MODBUS_SLAVE_H */

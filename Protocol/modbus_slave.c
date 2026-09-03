@@ -85,6 +85,14 @@ uint16_t MB_Slave_GetRxLen(void)
     return (uint16_t)s_rx_len;
 }
 
+void MB_Slave_GetStats(comm_stats_t *out)
+{
+    if (out != 0)
+    {
+        *out = s_stats;
+    }
+}
+
 /*====================================================================*/
 /* Response builders                                                   */
 /*====================================================================*/
