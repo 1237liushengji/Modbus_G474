@@ -499,6 +499,11 @@
               <FilePath>../Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_i2c_ex.c</FilePath>
             </File>
             <File>
+              <FileName>stm32g4xx_hal_spi.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_spi.c</FilePath>
+            </File>
+            <File>
               <FileName>stm32g4xx_hal_cortex.c</FileName>
               <FileType>1</FileType>
               <FilePath>../Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_cortex.c</FilePath>
@@ -558,6 +563,11 @@
               <FileType>1</FileType>
               <FilePath>..\BSP\bsp_key.c</FilePath>
             </File>
+            <File>
+              <FileName>bsp_w25q128.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\BSP\bsp_w25q128.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
@@ -567,6 +577,11 @@
               <FileName>config.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\Storage\config.c</FilePath>
+            </File>
+            <File>
+              <FileName>log.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Storage\log.c</FilePath>
             </File>
           </Files>
         </Group>

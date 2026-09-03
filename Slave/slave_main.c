@@ -22,10 +22,21 @@
 #include "bsp_board_cfg.h"
 #include "bsp_lcd.h"
 #include "bsp_key.h"
+#include "bsp_w25q128.h"
 #include "modbus_slave.h"
 #include "modbus_register.h"
 #include "config.h"
+#include "log.h"
 #include "types.h"
+
+/*====================================================================*/
+/* Log event bridge (slave engine events -> W25Q128)                   */
+/*====================================================================*/
+static void Slave_LogEvent(uint8_t event, uint16_t param)
+{
+    LOG_WriteEvent((log_event_t)event,
+                   (uint8_t)(param & 0xFFU), (uint8_t)((param >> 8) & 0xFFU), 0U);
+}
 
 /*====================================================================*/
 /* UI state                                                            */
@@ -343,6 +354,12 @@ void Slave_Main(void)
 
     MB_REG_Init();
 
+    /* flash log subsystem (W25Q128) */
+    (void)W25Q_Init();
+    LOG_SetTickSource(HAL_GetTick);
+    LOG_Init();
+    LOG_WriteEvent(LOG_BOOT, 0U, 0U, 0U);
+
     /* load parameters from 24C02 */
     (void)CONFIG_Init(&cfg);
     CONFIG_ApplyToRegisters(&cfg);
@@ -356,6 +373,7 @@ void Slave_Main(void)
 
     MB_Slave_Init(slave_id, baud);
     MB_Slave_SetTxFunc(RS485_SendFrame);
+    MB_Slave_SetEventCallback(Slave_LogEvent);
 
     KEY_Init();
     LCD_Init();
@@ -410,6 +428,8 @@ static void Slave_ApplyConfigChange(void)
     if (CONFIG_Save(&p))
     {
         MB_REG_ClearConfigDirty();
+        LOG_WriteEvent(LOG_CONFIG_CHANGE, p.slave_id,
+                       (uint8_t)p.baud_idx, 0U);
     }
 
     /* live apply: slave id + baudrate */

@@ -41,6 +41,7 @@ static volatile uint32_t s_last_byte_us = 0U;
 static uint8_t  s_tx_buf[MB_SLAVE_TX_BUF_SIZE];
 static uint8_t  s_resp_payload[1U + 2U * MB_FC_MAX_QTY_HOLDING]; /* shared by FC01/03 */
 static mb_slave_tx_func_t s_tx_func = 0;
+static mb_slave_event_cb_t s_ev_cb = 0;
 
 static comm_stats_t s_stats;   /* local mirror; copied into regs on use */
 
@@ -68,6 +69,19 @@ void MB_Slave_SetSlaveId(uint8_t slave_id)
 void MB_Slave_SetTxFunc(mb_slave_tx_func_t f)
 {
     s_tx_func = f;
+}
+
+void MB_Slave_SetEventCallback(mb_slave_event_cb_t cb)
+{
+    s_ev_cb = cb;
+}
+
+static void Slave_NotifyEvent(uint8_t event, uint16_t param)
+{
+    if (s_ev_cb != 0)
+    {
+        s_ev_cb(event, param);
+    }
 }
 
 /*====================================================================*/
@@ -150,6 +164,7 @@ static uint8_t Slave_SendException(uint8_t func, uint8_t exc_code)
     pdu[1] = exc_code;
     MB_REG_SetLastError(exc_code);
     s_stats.exception_count++;
+    Slave_NotifyEvent(LOG_EXCEPTION, exc_code);
     return Slave_SendResponse(pdu, 2U);
 }
 
@@ -322,6 +337,7 @@ static void Slave_ProcessFrame(void)
         s_stats.crc_error_count++;
         MB_REG_IncCrcError();
         MB_REG_SetDeviceStatus(2U);   /* comm warning */
+        Slave_NotifyEvent(LOG_CRC_ERROR, 0U);
         return;
     }
 

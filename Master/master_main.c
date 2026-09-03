@@ -18,9 +18,11 @@
 #include "bsp_rs485.h"
 #include "bsp_tick.h"
 #include "bsp_board_cfg.h"
+#include "bsp_w25q128.h"
 #include "modbus_master.h"
 #include "modbus_register.h"
 #include "config.h"
+#include "log.h"
 #include "types.h"
 
 #ifndef MASTER_SLAVE_ID_DEFAULT
@@ -47,6 +49,12 @@ static comm_stats_t s_stats_disp;
 static void RSCB_MasterRx(uint8_t byte)
 {
     MB_Master_OnRxByte(byte, BSP_Tick_GetUs());
+}
+
+static void Master_LogEvent(uint8_t event, uint16_t param)
+{
+    LOG_WriteEvent((log_event_t)event,
+                   (uint8_t)(param & 0xFFU), (uint8_t)((param >> 8) & 0xFFU), 0U);
 }
 
 static void Master_OnFinished(void)
@@ -86,6 +94,12 @@ void Master_Main(void)
     config_param_t cfg;
     uint32_t baud;
 
+    /* flash log subsystem (W25Q128) */
+    (void)W25Q_Init();
+    LOG_SetTickSource(HAL_GetTick);
+    LOG_Init();
+    LOG_WriteEvent(LOG_BOOT, 0U, 0U, 0U);
+
     /* load own link config (both boards carry a 24C02) */
     MB_REG_Init();
     (void)CONFIG_Init(&cfg);
@@ -100,6 +114,7 @@ void Master_Main(void)
 
     MB_Master_Init(s_target_slave, baud, MASTER_TIMEOUT_MS, MASTER_RETRY_MAX);
     MB_Master_SetTxFunc(RS485_SendFrame);
+    MB_Master_SetEventCallback(Master_LogEvent);
 
     s_poll_last_ms = HAL_GetTick();
     LED1_OFF;

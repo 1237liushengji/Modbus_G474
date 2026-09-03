@@ -34,6 +34,7 @@ static uint32_t s_timeout_us = 100000U;   /* 100 ms per attempt */
 static uint8_t  s_retry_max = 2U;         /* total tries = retry_max+1 */
 
 static mb_master_tx_func_t s_tx_func = 0;
+static mb_master_event_cb_t s_ev_cb = 0;
 
 static master_state_t s_state = MASTER_IDLE;
 static uint8_t  s_retry_left = 0U;
@@ -68,6 +69,19 @@ void MB_Master_Init(uint8_t slave_id, uint32_t baudrate,
 void MB_Master_SetTxFunc(mb_master_tx_func_t f)
 {
     s_tx_func = f;
+}
+
+void MB_Master_SetEventCallback(mb_master_event_cb_t cb)
+{
+    s_ev_cb = cb;
+}
+
+static void Master_NotifyEvent(uint8_t event, uint16_t param)
+{
+    if (s_ev_cb != 0)
+    {
+        s_ev_cb(event, param);
+    }
 }
 
 void MB_Master_OnRxByte(uint8_t byte, uint32_t now_us)
@@ -363,6 +377,8 @@ uint8_t MB_Master_Poll(uint32_t now_us)
                     s_consec_fails++;
                     s_state = MASTER_IDLE;
                     finished = 1U;
+                    Master_NotifyEvent(LOG_TIMEOUT,
+                                       (uint16_t)s_result.slave_id);
                 }
             }
             break;

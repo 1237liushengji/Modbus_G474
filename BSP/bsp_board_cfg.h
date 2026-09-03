@@ -84,6 +84,18 @@
                                       __HAL_RCC_GPIOD_CLK_ENABLE(); } while (0)
 
 /*====================================================================*/
+/* W25Q128 SPI flash (SPI1: CS PA4, SCK PA5, MISO PA6, MOSI PA7)      */
+/*====================================================================*/
+#define FLASH_CS_PORT            GPIOA
+#define FLASH_CS_PIN             GPIO_PIN_4
+#define FLASH_SCK_PORT           GPIOA
+#define FLASH_SCK_PIN            GPIO_PIN_5
+#define FLASH_MISO_PORT          GPIOA
+#define FLASH_MISO_PIN           GPIO_PIN_6
+#define FLASH_MOSI_PORT          GPIOA
+#define FLASH_MOSI_PIN           GPIO_PIN_7
+
+/*====================================================================*/
 /* Keys (WKUP=PA0 confirm, K0=PA2 next, K1=PA3 modify)                 */
 /*====================================================================*/
 #define KEY_WKUP_PORT            GPIOA

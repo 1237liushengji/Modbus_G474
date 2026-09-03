@@ -22,6 +22,9 @@
 /** TX function (RS485_SendFrame from BSP). */
 typedef void (*mb_master_tx_func_t)(const uint8_t *data, uint16_t len);
 
+/** Protocol event callback (timeout after retries), engine context. */
+typedef void (*mb_master_event_cb_t)(uint8_t event, uint16_t param);
+
 /** Transaction result as parsed by the master engine. */
 typedef struct {
     uint8_t  active;        /* 1 while transaction pending            */
@@ -46,6 +49,9 @@ void MB_Master_Init(uint8_t slave_id, uint32_t baudrate,
 
 /** Set TX function. */
 void MB_Master_SetTxFunc(mb_master_tx_func_t f);
+
+/** Set protocol event callback (may be NULL). */
+void MB_Master_SetEventCallback(mb_master_event_cb_t cb);
 
 /** Feed received bytes (call from UART RX ISR). */
 void MB_Master_OnRxByte(uint8_t byte, uint32_t now_us);

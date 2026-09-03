@@ -22,6 +22,10 @@
 /** Response/exception transmitter (set by application, e.g. RS485_SendFrame) */
 typedef void (*mb_slave_tx_func_t)(const uint8_t *data, uint16_t len);
 
+/** Protocol event callback (CRC error / exception sent), called from the
+ *  slave engine context. Application may forward events into the flash log. */
+typedef void (*mb_slave_event_cb_t)(uint8_t event, uint16_t param);
+
 /**
   * @brief  Initialize slave engine.
   * @param  slave_id  own Modbus address (1..247)
@@ -37,6 +41,9 @@ void MB_Slave_SetSlaveId(uint8_t slave_id);
 
 /** Set the function used to transmit responses. */
 void MB_Slave_SetTxFunc(mb_slave_tx_func_t f);
+
+/** Set the protocol event callback (may be NULL). */
+void MB_Slave_SetEventCallback(mb_slave_event_cb_t cb);
 
 /**
   * @brief  Feed one received byte (call from UART RX ISR context).
