@@ -91,6 +91,11 @@ void MB_REG_IncCrcError(void);
 void MB_REG_SetLastError(uint16_t err);
 void MB_REG_SetDeviceStatus(uint16_t st);
 
+/** Config-region write flag: set when a 40010..40015 register is written
+ *  through MB_REG_SetHolding; the app loop persists it to EEPROM. */
+uint8_t MB_REG_ConfigDirty(void);
+void    MB_REG_ClearConfigDirty(void);
+
 /** Default config values used when EEPROM is empty (v0.9+ loads real) */
 uint8_t  MB_REG_GetSlaveId(void);
 uint16_t MB_REG_GetBaudIdx(void);

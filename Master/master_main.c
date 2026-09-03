@@ -19,12 +19,17 @@
 #include "bsp_tick.h"
 #include "bsp_board_cfg.h"
 #include "modbus_master.h"
+#include "modbus_register.h"
+#include "config.h"
 #include "types.h"
+
+#ifndef MASTER_SLAVE_ID_DEFAULT
+#define MASTER_SLAVE_ID_DEFAULT  1U
+#endif
 
 /*====================================================================*/
 /* Tunables                                                            */
 /*====================================================================*/
-#define MASTER_SLAVE_ID      1U
 #define POLL_PERIOD_MS       500U
 #define MASTER_TIMEOUT_MS    100U
 #define MASTER_RETRY_MAX     2U
@@ -36,6 +41,7 @@
 static volatile uint32_t s_poll_last_ms = 0U;
 static volatile uint32_t s_fault_led_ms  = 0U;
 static volatile uint32_t s_poll_count    = 0U;
+static uint8_t s_target_slave = MASTER_SLAVE_ID_DEFAULT;
 static comm_stats_t s_stats_disp;
 
 static void RSCB_MasterRx(uint8_t byte)
@@ -71,17 +77,28 @@ static void Master_DoDemoWrite(void)
     static uint16_t s_demo_value = 300U;
 
     s_demo_value = (uint16_t)(300U + (s_poll_count % 20U) * 5U); /* 300..395 */
-    MB_Master_WriteSingle(MASTER_SLAVE_ID, 0x09 /* 40010 TempLimit */,
+    MB_Master_WriteSingle(s_target_slave, 0x09 /* 40010 TempLimit */,
                           s_demo_value);
 }
 
 void Master_Main(void)
 {
-    RS485_Init(RS485_DEFAULT_BAUDRATE);
+    config_param_t cfg;
+    uint32_t baud;
+
+    /* load own link config (both boards carry a 24C02) */
+    MB_REG_Init();
+    (void)CONFIG_Init(&cfg);
+    CONFIG_ApplyToRegisters(&cfg);
+    MB_REG_ClearConfigDirty();
+
+    s_target_slave = cfg.slave_id;      /* poll this slave id */
+    baud = MB_REG_BaudFromIdx(cfg.baud_idx);
+
+    RS485_Init(baud);
     RS485_SetRxCallback(RSCB_MasterRx);
 
-    MB_Master_Init(MASTER_SLAVE_ID, RS485_DEFAULT_BAUDRATE,
-                   MASTER_TIMEOUT_MS, MASTER_RETRY_MAX);
+    MB_Master_Init(s_target_slave, baud, MASTER_TIMEOUT_MS, MASTER_RETRY_MAX);
     MB_Master_SetTxFunc(RS485_SendFrame);
 
     s_poll_last_ms = HAL_GetTick();
@@ -103,7 +120,7 @@ void Master_Main(void)
                 else
                 {
                     /* read temperature..status (5 regs) */
-                    MB_Master_ReadHolding(MASTER_SLAVE_ID, 0x00, 5U);
+                    MB_Master_ReadHolding(s_target_slave, 0x00, 5U);
                 }
             }
         }

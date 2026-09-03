@@ -32,6 +32,9 @@ void MB_Slave_Init(uint8_t slave_id, uint32_t baudrate);
 /** Update t3.5 after a baudrate change. */
 void MB_Slave_SetBaudrate(uint32_t baudrate);
 
+/** Change own slave id at runtime (after register write). */
+void MB_Slave_SetSlaveId(uint8_t slave_id);
+
 /** Set the function used to transmit responses. */
 void MB_Slave_SetTxFunc(mb_slave_tx_func_t f);
 

@@ -339,7 +339,7 @@
               <MiscControls></MiscControls>
               <Define>USE_HAL_DRIVER,STM32G474xx</Define>
               <Undefine></Undefine>
-              <IncludePath>../Core/Inc;../Drivers/STM32G4xx_HAL_Driver/Inc;../Drivers/STM32G4xx_HAL_Driver/Inc/Legacy;../Drivers/CMSIS/Device/ST/STM32G4xx/Include;../Drivers/CMSIS/Include;..\Drivers\User\Inc;..\BSP;..\Common;..\Protocol;..\Master;..\Slave</IncludePath>
+              <IncludePath>../Core/Inc;../Drivers/STM32G4xx_HAL_Driver/Inc;../Drivers/STM32G4xx_HAL_Driver/Inc/Legacy;../Drivers/CMSIS/Device/ST/STM32G4xx/Include;../Drivers/CMSIS/Include;..\Drivers\User\Inc;..\BSP;..\Common;..\Protocol;..\Master;..\Slave;..\Storage</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -489,6 +489,16 @@
               <FilePath>../Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_pwr.c</FilePath>
             </File>
             <File>
+              <FileName>stm32g4xx_hal_i2c.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_i2c.c</FilePath>
+            </File>
+            <File>
+              <FileName>stm32g4xx_hal_i2c_ex.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_i2c_ex.c</FilePath>
+            </File>
+            <File>
               <FileName>stm32g4xx_hal_cortex.c</FileName>
               <FileType>1</FileType>
               <FilePath>../Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_cortex.c</FilePath>
@@ -532,6 +542,21 @@
               <FileName>bsp_tick.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\BSP\bsp_tick.c</FilePath>
+            </File>
+            <File>
+              <FileName>bsp_eeprom.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\BSP\bsp_eeprom.c</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>Modbus/Storage</GroupName>
+          <Files>
+            <File>
+              <FileName>config.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Storage\config.c</FilePath>
             </File>
           </Files>
         </Group>

@@ -60,6 +60,11 @@ void MB_Slave_SetBaudrate(uint32_t baudrate)
     s_t35_us = MB_T35_US(baudrate);
 }
 
+void MB_Slave_SetSlaveId(uint8_t slave_id)
+{
+    s_slave_id = slave_id;
+}
+
 void MB_Slave_SetTxFunc(mb_slave_tx_func_t f)
 {
     s_tx_func = f;

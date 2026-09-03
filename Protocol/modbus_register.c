@@ -15,6 +15,7 @@
 static uint16_t s_holding[MB_REG_HOLD_COUNT];
 static uint16_t s_input[MB_REG_IN_COUNT];
 static uint8_t  s_coils;
+static volatile uint8_t s_cfg_dirty = 0U;
 
 /*====================================================================*/
 /* Defaults (pre-config-load values)                                   */
@@ -74,7 +75,21 @@ void MB_REG_SetHolding(uint16_t addr, uint16_t value)
     if (addr < MB_REG_HOLD_COUNT)
     {
         s_holding[addr] = value;
+        if (addr >= MB_REG_HOLD_CFG_FIRST)
+        {
+            s_cfg_dirty = 1U;   /* 40010..40015 changed -> persist later */
+        }
     }
+}
+
+uint8_t MB_REG_ConfigDirty(void)
+{
+    return s_cfg_dirty;
+}
+
+void MB_REG_ClearConfigDirty(void)
+{
+    s_cfg_dirty = 0U;
 }
 
 uint8_t MB_REG_HoldingWritable(uint16_t addr)
