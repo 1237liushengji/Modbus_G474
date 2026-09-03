@@ -1,0 +1,39 @@
+# ===== Keil MDK-ARM build outputs =====
+/MDK-ARM/G474/
+/MDK-ARM/Listings/
+/MDK-ARM/Objects/
+*.o
+*.d
+*.axf
+*.hex
+*.htm
+*.lnp
+*.map
+*.dep
+*.build_log.htm
+*.crf
+*.sct.bak
+*.uvguix.*
+*.uvoptx
+*.scvd
+/MDK-ARM/DebugConfig/
+
+# ===== CubeMX / IDE =====
+.mxproject
+*.launch
+.vscode/
+.idea/
+.settings/
+.project
+.cproject
+
+# ===== Python =====
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# ===== Misc =====
+Thumbs.db
+Desktop.ini
+*.log
