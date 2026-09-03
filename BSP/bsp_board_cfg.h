@@ -66,4 +66,32 @@
 #define RS485_DEFAULT_BAUDRATE   115200UL
 #define RS485_DEFAULT_SLAVE_ID   1
 
+/*====================================================================*/
+/* LCD (SPI TFT, soft SPI - see BSP/bsp_lcd.c)                         */
+/*====================================================================*/
+#define LCD_CTRL_SELECT          LCD_CTRL_ST7789   /* 0=ST7789 1=ILI9341 2=ST7735 */
+#define LCD_CS_PORT              GPIOD
+#define LCD_CS_PIN               GPIO_PIN_11
+#define LCD_SCL_PORT             GPIOB
+#define LCD_SCL_PIN              GPIO_PIN_3
+#define LCD_SDA_PORT             GPIOB
+#define LCD_SDA_PIN              GPIO_PIN_5
+#define LCD_DC_PORT              GPIOD
+#define LCD_DC_PIN               GPIO_PIN_12
+#define LCD_BL_PORT              GPIOD
+#define LCD_BL_PIN               GPIO_PIN_13
+#define LCD_GPIO_CLK_ENABLE()    do { __HAL_RCC_GPIOB_CLK_ENABLE(); \
+                                      __HAL_RCC_GPIOD_CLK_ENABLE(); } while (0)
+
+/*====================================================================*/
+/* Keys (WKUP=PA0 confirm, K0=PA2 next, K1=PA3 modify)                 */
+/*====================================================================*/
+#define KEY_WKUP_PORT            GPIOA
+#define KEY_WKUP_PIN             GPIO_PIN_0
+#define KEY_K0_PORT              GPIOA
+#define KEY_K0_PIN               GPIO_PIN_2
+#define KEY_K1_PORT              GPIOA
+#define KEY_K1_PIN               GPIO_PIN_3
+#define KEY_GPIO_CLK_ENABLE()    __HAL_RCC_GPIOA_CLK_ENABLE()
+
 #endif /* __BSP_BOARD_CFG_H */
