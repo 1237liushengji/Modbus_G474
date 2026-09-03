@@ -531,6 +531,16 @@
           </Files>
         </Group>
         <Group>
+          <GroupName>Modbus/Protocol</GroupName>
+          <Files>
+            <File>
+              <FileName>modbus_crc.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Protocol\modbus_crc.c</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
           <GroupName>::CMSIS</GroupName>
         </Group>
       </Groups>
