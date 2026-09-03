@@ -39,6 +39,7 @@ static volatile uint16_t s_rx_len = 0U;
 static volatile uint32_t s_last_byte_us = 0U;
 
 static uint8_t  s_tx_buf[MB_SLAVE_TX_BUF_SIZE];
+static uint8_t  s_resp_payload[1U + 2U * MB_FC_MAX_QTY_HOLDING]; /* shared by FC01/03 */
 static mb_slave_tx_func_t s_tx_func = 0;
 
 static comm_stats_t s_stats;   /* local mirror; copied into regs on use */
@@ -143,12 +144,122 @@ static uint8_t Slave_SendException(uint8_t func, uint8_t exc_code)
 /* Function code handlers                                              */
 /*====================================================================*/
 
+/* 0x01 Read Coils: coil bits packed LSB-first, one byte per 8 coils */
+static void Slave_FC01(const uint8_t *req)
+{
+    uint16_t start = (uint16_t)((req[0] << 8) | req[1]);
+    uint16_t qty   = (uint16_t)((req[2] << 8) | req[3]);
+    uint8_t  *resp = s_resp_payload;
+    uint16_t byte_cnt;
+    uint16_t i;
+
+    if (qty == 0U || qty > MB_FC_MAX_QTY_COILS)
+    {
+        Slave_SendException(MB_FC_READ_COILS, MB_EX_ILLEGAL_VALUE);
+        return;
+    }
+    if ((uint32_t)start + qty > MB_REG_COIL_COUNT)
+    {
+        Slave_SendException(MB_FC_READ_COILS, MB_EX_ILLEGAL_ADDRESS);
+        return;
+    }
+
+    byte_cnt = (uint16_t)((qty + 7U) / 8U);
+    resp[0] = (uint8_t)byte_cnt;
+    for (i = 0; i < byte_cnt; i++)
+    {
+        uint8_t byte = 0U;
+        uint8_t b;
+        for (b = 0; b < 8U; b++)
+        {
+            uint16_t coil_addr = (uint16_t)(start + i * 8U + b);
+            if ((coil_addr < start + qty) && (MB_REG_GetCoil(coil_addr) != 0U))
+            {
+                byte |= (uint8_t)(1U << b);
+            }
+        }
+        resp[1 + i] = byte;
+    }
+    Slave_SendOk(MB_FC_READ_COILS, resp, (uint16_t)(1U + byte_cnt));
+}
+
+/* 0x06 Write Single Register (echo request on success) */
+static void Slave_FC06(const uint8_t *req)
+{
+    uint16_t addr  = (uint16_t)((req[0] << 8) | req[1]);
+    uint16_t value = (uint16_t)((req[2] << 8) | req[3]);
+
+    if (addr > MB_REG_HOLD_MAX_ADDR)
+    {
+        Slave_SendException(MB_FC_WRITE_SINGLE_REG, MB_EX_ILLEGAL_ADDRESS);
+        return;
+    }
+    if (MB_REG_HoldingWritable(addr) == 0U)
+    {
+        /* write to read-only (measured/stats) region */
+        Slave_SendException(MB_FC_WRITE_SINGLE_REG, MB_EX_ILLEGAL_ADDRESS);
+        return;
+    }
+    MB_REG_SetHolding(addr, value);
+    /* echo request back */
+    Slave_SendOk(MB_FC_WRITE_SINGLE_REG, req, 4U);
+}
+
+/* 0x10 Write Multiple Registers */
+static void Slave_FC10(const uint8_t *req, uint16_t pdu_len)
+{
+    uint16_t start = (uint16_t)((req[0] << 8) | req[1]);
+    uint16_t qty   = (uint16_t)((req[2] << 8) | req[3]);
+    uint8_t  byte_cnt = req[4];
+    uint16_t i;
+
+    if (qty == 0U || qty > MB_FC_MAX_WRITE_REGS)
+    {
+        Slave_SendException(MB_FC_WRITE_MULTI_REGS, MB_EX_ILLEGAL_VALUE);
+        return;
+    }
+    if (byte_cnt != (uint8_t)(qty * 2U))
+    {
+        Slave_SendException(MB_FC_WRITE_MULTI_REGS, MB_EX_ILLEGAL_VALUE);
+        return;
+    }
+    /* pdu_len includes [start(2) qty(2) bytecnt(1) data] */
+    if ((uint32_t)byte_cnt + 5U > pdu_len)
+    {
+        Slave_SendException(MB_FC_WRITE_MULTI_REGS, MB_EX_ILLEGAL_VALUE);
+        return;
+    }
+    if ((uint32_t)start + qty > MB_REG_HOLD_COUNT)
+    {
+        Slave_SendException(MB_FC_WRITE_MULTI_REGS, MB_EX_ILLEGAL_ADDRESS);
+        return;
+    }
+    /* write range must be fully inside config region */
+    for (i = 0; i < qty; i++)
+    {
+        if (MB_REG_HoldingWritable((uint16_t)(start + i)) == 0U)
+        {
+            Slave_SendException(MB_FC_WRITE_MULTI_REGS, MB_EX_ILLEGAL_ADDRESS);
+            return;
+        }
+    }
+
+    for (i = 0; i < qty; i++)
+    {
+        uint16_t v = (uint16_t)((req[5 + 2U * i] << 8) | req[6 + 2U * i]);
+        MB_REG_SetHolding((uint16_t)(start + i), v);
+    }
+
+    /* response: echo start + qty */
+    Slave_SendOk(MB_FC_WRITE_MULTI_REGS, req, 4U);
+}
+
 /* 0x03 Read Holding Registers */
 static void Slave_FC03(const uint8_t *req)
 {
     uint16_t start = (uint16_t)((req[0] << 8) | req[1]);
     uint16_t qty   = (uint16_t)((req[2] << 8) | req[3]);
-    uint8_t  resp[1U + 2U * MB_FC_MAX_QTY_HOLDING];
+    uint8_t  *resp = s_resp_payload;
     uint16_t i;
 
     if (qty == 0U || qty > MB_FC_MAX_QTY_HOLDING)
@@ -211,10 +322,43 @@ static void Slave_ProcessFrame(void)
 
     switch (func)
     {
+        case MB_FC_READ_COILS:
+            if (pdu_len == 4U)
+            {
+                Slave_FC01(&s_rx_buf[2]);
+            }
+            else
+            {
+                Slave_SendException(func, MB_EX_ILLEGAL_VALUE);
+            }
+            break;
+
         case MB_FC_READ_HOLDING_REGS:
             if (pdu_len == 4U)
             {
                 Slave_FC03(&s_rx_buf[2]);
+            }
+            else
+            {
+                Slave_SendException(func, MB_EX_ILLEGAL_VALUE);
+            }
+            break;
+
+        case MB_FC_WRITE_SINGLE_REG:
+            if (pdu_len == 4U)
+            {
+                Slave_FC06(&s_rx_buf[2]);
+            }
+            else
+            {
+                Slave_SendException(func, MB_EX_ILLEGAL_VALUE);
+            }
+            break;
+
+        case MB_FC_WRITE_MULTI_REGS:
+            if (pdu_len >= 5U)
+            {
+                Slave_FC10(&s_rx_buf[2], pdu_len);
             }
             else
             {
