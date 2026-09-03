@@ -25,6 +25,10 @@
 #include "led.h"
 #include "bsp_rs485.h"
 #include "bsp_board_cfg.h"
+#include "bsp_tick.h"
+#include "modbus_slave.h"
+#include "modbus_register.h"
+#include "modbus.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -45,14 +49,16 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-/* v0.2 demo: RS485 link verification.
- *   SLAVE : echoes every received byte (loopback partner)
- *   MASTER: sends a "ping" frame every 500 ms, counts echoes on LED1 */
-static volatile uint8_t  s_echo_byte = 0;
-static volatile uint8_t  s_echo_flag = 0;
-static volatile uint32_t s_rx_irq_cnt = 0;
-static uint32_t s_ping_tick = 0;
-static const uint8_t s_ping[] = {'M','B','0','2'};
+/* v0.4 demo: real Modbus slave engine on the SLAVE node.
+ * MASTER node keeps a raw probe (0x03 request every 500ms) to verify
+ * the two-board link until the full master stack lands in v0.7. */
+static volatile uint32_t s_master_rx_cnt = 0;
+static volatile uint32_t s_master_rx_ok  = 0;
+static uint32_t s_probe_tick = 0;
+static const uint8_t s_probe_frame[] = {
+    /* slave 0x01, FC 0x03, start 0x0000, qty 0x0002, CRC computed below */
+    0x01, 0x03, 0x00, 0x00, 0x00, 0x02, 0xC4, 0x0B
+};
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -63,12 +69,20 @@ void SystemClock_Config(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-static void RS485_RxEchoCb(uint8_t byte)
+#if (MODBUS_NODE_ROLE == NODE_ROLE_SLAVE)
+/* feed every RX byte into the Modbus slave engine */
+static void RS485_RxToSlave(uint8_t byte)
 {
-  s_echo_byte = byte;
-  s_echo_flag = 1;
-  s_rx_irq_cnt++;
+  MB_Slave_OnRxByte(byte, BSP_Tick_GetUs());
 }
+#else
+/* MASTER probe mode: count raw bytes/response received */
+static void RS485_RxProbeCb(uint8_t byte)
+{
+  (void)byte;
+  s_master_rx_cnt++;
+}
+#endif
 /* USER CODE END 0 */
 
 /**
@@ -102,10 +116,17 @@ int main(void)
   MX_GPIO_Init();
   /* USER CODE BEGIN 2 */
   LED_Init();
+  BSP_Tick_Init();
+  MB_REG_Init();
   RS485_Init(RS485_DEFAULT_BAUDRATE);
-  RS485_SetRxCallback(RS485_RxEchoCb);
-#if (MODBUS_NODE_ROLE == NODE_ROLE_MASTER)
-  s_ping_tick = HAL_GetTick();
+
+#if (MODBUS_NODE_ROLE == NODE_ROLE_SLAVE)
+  MB_Slave_Init(RS485_DEFAULT_SLAVE_ID, RS485_DEFAULT_BAUDRATE);
+  MB_Slave_SetTxFunc(RS485_SendFrame);
+  RS485_SetRxCallback(RS485_RxToSlave);
+#else
+  RS485_SetRxCallback(RS485_RxProbeCb);
+  s_probe_tick = HAL_GetTick();
 #endif
   /* USER CODE END 2 */
 
@@ -115,28 +136,31 @@ int main(void)
   {
     /* USER CODE END WHILE */
 
-#if (MODBUS_NODE_ROLE == NODE_ROLE_MASTER)
-    /* MASTER demo: send ping every 500ms; LED1 blinks on each echo */
-    if ((HAL_GetTick() - s_ping_tick) >= 500U)
+#if (MODBUS_NODE_ROLE == NODE_ROLE_SLAVE)
+    /* SLAVE: protocol engine poll (frame timeout detection + dispatch) */
+    if (MB_Slave_Poll(BSP_Tick_GetUs()) != 0U)
     {
-      s_ping_tick = HAL_GetTick();
-      RS485_SendFrame(s_ping, sizeof(s_ping));
+      LED2_Toggle;   /* a response was sent */
     }
-    if (s_echo_flag != 0U)
+    HAL_Delay(1);
+#else
+    /* MASTER probe: send read request every 500ms, LED1 = link alive */
+    if ((HAL_GetTick() - s_probe_tick) >= 500U)
     {
-      s_echo_flag = 0;
-      LED1_Toggle;   /* echo received: green/blue LED activity */
+      uint32_t before = s_master_rx_cnt;
+      s_probe_tick = HAL_GetTick();
+      RS485_SendFrame(s_probe_frame, sizeof(s_probe_frame));
+      /* simple wait 10ms then check if any bytes came back */
+      HAL_Delay(10);
+      if (s_master_rx_cnt > before)
+      {
+        s_master_rx_ok++;
+        LED1_ON;      /* response received */
+        HAL_Delay(80);
+        LED1_OFF;
+      }
     }
     HAL_Delay(5);
-#else
-    /* SLAVE demo: echo any received byte back (loopback partner) */
-    if (s_echo_flag != 0U)
-    {
-      s_echo_flag = 0;
-      RS485_SendFrame(&s_echo_byte, 1U);
-      LED2_Toggle;   /* activity LED */
-    }
-    HAL_Delay(2);
 #endif
 
     /* USER CODE BEGIN 3 */

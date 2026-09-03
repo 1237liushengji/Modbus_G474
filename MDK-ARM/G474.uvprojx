@@ -339,7 +339,7 @@
               <MiscControls></MiscControls>
               <Define>USE_HAL_DRIVER,STM32G474xx</Define>
               <Undefine></Undefine>
-              <IncludePath>../Core/Inc;../Drivers/STM32G4xx_HAL_Driver/Inc;../Drivers/STM32G4xx_HAL_Driver/Inc/Legacy;../Drivers/CMSIS/Device/ST/STM32G4xx/Include;../Drivers/CMSIS/Include;..\Drivers\User\Inc;..\BSP;..\Common</IncludePath>
+              <IncludePath>../Core/Inc;../Drivers/STM32G4xx_HAL_Driver/Inc;../Drivers/STM32G4xx_HAL_Driver/Inc/Legacy;../Drivers/CMSIS/Device/ST/STM32G4xx/Include;../Drivers/CMSIS/Include;..\Drivers\User\Inc;..\BSP;..\Common;..\Protocol</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -528,6 +528,11 @@
               <FileType>1</FileType>
               <FilePath>..\BSP\bsp_rs485.c</FilePath>
             </File>
+            <File>
+              <FileName>bsp_tick.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\BSP\bsp_tick.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
@@ -537,6 +542,16 @@
               <FileName>modbus_crc.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\Protocol\modbus_crc.c</FilePath>
+            </File>
+            <File>
+              <FileName>modbus_register.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Protocol\modbus_register.c</FilePath>
+            </File>
+            <File>
+              <FileName>modbus_slave.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Protocol\modbus_slave.c</FilePath>
             </File>
           </Files>
         </Group>
