@@ -15,6 +15,7 @@
 /* Local                                                                */
 /*====================================================================*/
 static rs485_rx_cb_t s_rx_cb = 0;
+static rs485_rx_frame_cb_t s_rx_frame_cb = 0;
 static volatile uint32_t s_rx_count = 0;
 
 static void RxByteBridge(uint8_t byte)
@@ -25,6 +26,17 @@ static void RxByteBridge(uint8_t byte)
         s_rx_cb(byte);
     }
 }
+
+#if (RS485_RX_MODE == 1)
+static void RxFrameBridge(const uint8_t *frame, uint16_t len, uint32_t now_us)
+{
+    s_rx_count += len;
+    if (s_rx_frame_cb != 0)
+    {
+        s_rx_frame_cb(frame, len, now_us);
+    }
+}
+#endif
 
 /*====================================================================*/
 /* Public API                                                          */
@@ -46,6 +58,9 @@ int32_t RS485_Init(uint32_t baudrate)
 
     BSP_UART_Init(baudrate);
     BSP_UART_SetRxCallback(RxByteBridge);
+#if (RS485_RX_MODE == 1)
+    BSP_UART_SetRxFrameCallback(RxFrameBridge);
+#endif
     return 0;
 }
 
@@ -82,6 +97,13 @@ void RS485_SetRxCallback(rs485_rx_cb_t cb)
 {
     s_rx_cb = cb;
 }
+
+#if (RS485_RX_MODE == 1)
+void RS485_SetRxFrameCallback(rs485_rx_frame_cb_t cb)
+{
+    s_rx_frame_cb = cb;
+}
+#endif
 
 uint32_t RS485_GetRxCount(void)
 {

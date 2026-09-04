@@ -329,6 +329,66 @@ static void Master_HandleResponse(void)
 }
 
 /*====================================================================*/
+/* Timeout handling: retry or give up (shared by Poll and OnRxFrame)   */
+/*====================================================================*/
+static uint8_t Master_TimeoutAction(void)
+{
+    uint8_t finished = 0U;
+
+    s_rx_len = 0U;
+    s_stats.timeout_count++;
+    if (s_retry_left > 0U)
+    {
+        s_retry_left--;
+        s_stats.retry_count++;
+        s_state = MASTER_SEND;      /* retransmit next poll */
+    }
+    else
+    {
+        /* give up */
+        s_result.ok = 0U;
+        s_result.exception = 0U;
+        s_result.timed_out = 1U;
+        s_result.payload_len = 0U;
+        s_consec_fails++;
+        s_state = MASTER_IDLE;
+        finished = 1U;
+        Master_NotifyEvent(LOG_TIMEOUT, (uint16_t)s_result.slave_id);
+    }
+    return finished;
+}
+
+/*====================================================================*/
+/* Whole-frame entry (DMA receive mode)                                */
+/*====================================================================*/
+uint8_t MB_Master_OnRxFrame(const uint8_t *frame, uint16_t len)
+{
+    uint16_t i;
+
+    if (s_state != MASTER_WAIT)
+    {
+        return 0U;      /* not expecting a response */
+    }
+    if ((frame == 0) || (len < 4U) || (len > (uint16_t)sizeof(s_rx_buf)))
+    {
+        /* garbage -> retry immediately */
+        return Master_TimeoutAction();
+    }
+    for (i = 0U; i < len; i++)
+    {
+        s_rx_buf[i] = frame[i];
+    }
+    s_rx_len = len;
+    Master_HandleResponse();
+    if (s_state == MASTER_IDLE)
+    {
+        return 1U;      /* valid response processed */
+    }
+    /* invalid frame (bad addr/crc/func): do not wait for timeout */
+    return Master_TimeoutAction();
+}
+
+/*====================================================================*/
 /* Poll (main loop)                                                    */
 /*====================================================================*/
 uint8_t MB_Master_Poll(uint32_t now_us)
@@ -359,26 +419,9 @@ uint8_t MB_Master_Poll(uint32_t now_us)
             if (s_state == MASTER_WAIT &&
                 ((uint32_t)(now_us - s_sent_us) >= s_timeout_us))
             {
-                s_rx_len = 0U;
-                s_stats.timeout_count++;
-                if (s_retry_left > 0U)
+                if (Master_TimeoutAction())
                 {
-                    s_retry_left--;
-                    s_stats.retry_count++;
-                    s_state = MASTER_SEND;      /* retransmit next poll */
-                }
-                else
-                {
-                    /* give up */
-                    s_result.ok = 0U;
-                    s_result.exception = 0U;
-                    s_result.timed_out = 1U;
-                    s_result.payload_len = 0U;
-                    s_consec_fails++;
-                    s_state = MASTER_IDLE;
                     finished = 1U;
-                    Master_NotifyEvent(LOG_TIMEOUT,
-                                       (uint16_t)s_result.slave_id);
                 }
             }
             break;

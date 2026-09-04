@@ -37,6 +37,13 @@
 #define RS485_UART_IRQHandler    USART3_IRQHandler
 #define RS485_UART_CLK_ENABLE()  __HAL_RCC_USART3_CLK_ENABLE()
 
+/* RX path selection:
+ *   0 = RXNE interrupt per byte  (V1.0 baseline, byte callback)
+ *   1 = DMA circular + IDLE line (V1.4, default, frame callback)      */
+#ifndef RS485_RX_MODE
+#define RS485_RX_MODE            1
+#endif
+
 #define RS485_TX_GPIO_PORT       GPIOB
 #define RS485_TX_PIN             GPIO_PIN_10
 #define RS485_RX_GPIO_PORT       GPIOB
@@ -68,8 +75,9 @@
 
 /*====================================================================*/
 /* LCD (SPI TFT, soft SPI - see BSP/bsp_lcd.c)                         */
+/* Controller: 0=ST7789(240x240) 1=ILI9341(240x320) 2=ST7735(128x160)  */
 /*====================================================================*/
-#define LCD_CTRL_SELECT          LCD_CTRL_ST7789   /* 0=ST7789 1=ILI9341 2=ST7735 */
+#define LCD_CTRL_SELECT          0
 #define LCD_CS_PORT              GPIOD
 #define LCD_CS_PIN               GPIO_PIN_11
 #define LCD_SCL_PORT             GPIOB

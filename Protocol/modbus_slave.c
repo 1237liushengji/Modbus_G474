@@ -419,3 +419,26 @@ uint8_t MB_Slave_Poll(uint32_t now_us)
     }
     return sent;
 }
+
+/*====================================================================*/
+/* Whole-frame entry (DMA receive mode)                                */
+/*====================================================================*/
+uint8_t MB_Slave_OnRxFrame(const uint8_t *frame, uint16_t len)
+{
+    uint16_t i;
+
+    if ((frame == 0) || (len == 0U) || (len > (uint16_t)sizeof(s_rx_buf)))
+    {
+        return 0U;      /* invalid: drop */
+    }
+    /* the frame boundary is already known (t3.5 in the DMA service),
+       so parse it directly in the main-loop context */
+    for (i = 0U; i < len; i++)
+    {
+        s_rx_buf[i] = frame[i];
+    }
+    s_rx_len = len;
+    Slave_ProcessFrame();
+    s_rx_len = 0U;
+    return 1U;
+}

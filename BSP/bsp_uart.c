@@ -3,21 +3,52 @@
   * @file    bsp_uart.c
   * @brief   Register-level USART3 driver for RS485 link.
   *
-  *  Why register-level instead of HAL_UART_* ?
-  *   - keeps the Keil project free of extra HAL source files
-  *   - full control of TXE/TC/ORE handling (RS485 timing is critical)
-  *   - matches the "self-init BSP" style already used by led.c
+  *  RX architecture selected by RS485_RX_MODE (bsp_board_cfg.h):
+  *    0 - RXNE interrupt per byte (V1.0 baseline, byte callback)
+  *    1 - DMA circular + IDLE frame detection (V1.4, default):
+  *        UART --DMA--> s_dma_buf --(IDLE ISR)--> s_ring --(service)--> frame
   *
-  *  USART3 clock = PCLK1 (APB1, no divider in SystemClock_Config).
+  *  DMA mode details:
+  *   - DMA1 channel in circular mode continuously fills s_dma_buf
+  *   - the USART IDLE interrupt fires when the line stays idle >= 1 char,
+  *     i.e. at the end of every frame (Modbus inter-frame gap is >= 3.5
+  *     chars, intra-frame gap <= 1.5 chars, so IDLE reliably marks a
+  *     frame boundary in this protocol)
+  *   - the ISR moves the newly arrived bytes into a software ring and
+  *     timestamps the arrival
+  *   - BSP_UART_RxDmaService() (main loop) waits t3.5 of silence and then
+  *     emits the complete frame through the frame callback
+  *
+  *  TX is blocking with explicit TC wait (RS485 direction switching).
   ******************************************************************************
   */
 #include "bsp_uart.h"
 #include "bsp_board_cfg.h"
+#include "bsp_tick.h"
+#include "ring_buffer.h"
 
 /*====================================================================*/
 /* Local objects                                                       */
 /*====================================================================*/
 static bsp_uart_rx_cb_t s_rx_cb = 0;
+static bsp_uart_rx_frame_cb_t s_frame_cb = 0;
+
+#if (RS485_RX_MODE == 1)
+#include "stm32g4xx_hal_dma.h"
+
+#define RX_DMA_BUF_SIZE   512U   /* max RTU frame 256 B, margin for wrap  */
+#define RX_RING_SIZE      512U
+#define RX_MAX_FRAME_LEN  256U
+
+static uint8_t  s_dma_buf[RX_DMA_BUF_SIZE];
+static uint8_t  s_ring_storage[RX_RING_SIZE];
+static ring_buffer_t s_ring;
+static DMA_HandleTypeDef s_hdma;
+
+static volatile uint16_t s_dma_last_pos = 0U;   /* consumed DMA position */
+static volatile uint32_t s_last_byte_us = 0U;
+static uint32_t s_t35_us = 4000U;   /* set from baudrate (DMA mode) */
+#endif
 
 /*====================================================================*/
 /* Static helpers                                                      */
@@ -70,8 +101,36 @@ int32_t BSP_UART_Init(uint32_t baudrate)
     /* UE=1, TE=1, RE=1; 1 stop bit is default */
     RS485_UART_PERIPH->CR1 = USART_CR1_UE | USART_CR1_TE | USART_CR1_RE;
 
-    /* RXNE interrupt enable */
+#if (RS485_RX_MODE == 1)
+    /* ---- DMA circular RX + IDLE frame detection ---- */
+    s_t35_us = (baudrate == 0U) ? 10000U : (uint32_t)(38500000UL / baudrate);
+    RING_Init(&s_ring, s_ring_storage, sizeof(s_ring_storage));
+
+    __HAL_RCC_DMA1_CLK_ENABLE();
+    __HAL_RCC_DMAMUX1_CLK_ENABLE();
+
+    s_hdma.Instance = DMA1_Channel2;
+    s_hdma.Init.Request = DMA_REQUEST_USART3_RX;   /* DMAMUX req 28 */
+    s_hdma.Init.Direction = DMA_PERIPH_TO_MEMORY;
+    s_hdma.Init.PeriphInc = DMA_PINC_DISABLE;
+    s_hdma.Init.MemInc = DMA_MINC_ENABLE;
+    s_hdma.Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
+    s_hdma.Init.MemDataAlignment = DMA_MDATAALIGN_BYTE;
+    s_hdma.Init.Mode = DMA_CIRCULAR;
+    s_hdma.Init.Priority = DMA_PRIORITY_HIGH;
+    if (HAL_DMA_Init(&s_hdma) == HAL_OK)
+    {
+        HAL_DMA_Start(&s_hdma, (uint32_t)&RS485_UART_PERIPH->RDR,
+                      (uint32_t)s_dma_buf, RX_DMA_BUF_SIZE);
+        /* ask the USART to drive the DMA receiver */
+        RS485_UART_PERIPH->CR3 |= USART_CR3_DMAR;
+        /* IDLE line interrupt */
+        RS485_UART_PERIPH->CR1 |= USART_CR1_IDLEIE;
+    }
+#else
+    /* ---- RXNE interrupt mode ---- */
     RS485_UART_PERIPH->CR1 |= USART_CR1_RXNEIE;
+#endif
 
     /* NVIC: medium priority, enable USART3 IRQ */
     HAL_NVIC_SetPriority(RS485_UART_IRQn, 5, 0);
@@ -85,11 +144,23 @@ void BSP_UART_SetBaudrate(uint32_t baudrate)
     /* Recompute BRR; UART is kept enabled, byte in flight may be corrupted,
        caller must change baud only in idle state. */
     RS485_UART_PERIPH->BRR = UART_ComputeBRR(baudrate);
+#if (RS485_RX_MODE == 1)
+    s_t35_us = (baudrate == 0U) ? 10000U : (uint32_t)(38500000UL / baudrate);
+#endif
 }
 
 void BSP_UART_SetRxCallback(bsp_uart_rx_cb_t cb)
 {
     s_rx_cb = cb;
+}
+
+void BSP_UART_SetRxFrameCallback(bsp_uart_rx_frame_cb_t cb)
+{
+#if (RS485_RX_MODE == 1)
+    s_frame_cb = cb;
+#else
+    (void)cb;
+#endif
 }
 
 void BSP_UART_SendBytes(const uint8_t *data, uint16_t len)
@@ -119,10 +190,80 @@ void BSP_UART_WaitTxComplete(void)
     RS485_UART_PERIPH->ICR = USART_ICR_TCCF;
 }
 
+/*====================================================================*/
+/* DMA mode: ISR moves bytes DMA->ring; main loop assembles frames     */
+/*====================================================================*/
+#if (RS485_RX_MODE == 1)
+static void DMA_RingPull(void)
+{
+    uint16_t ndtr = (uint16_t)s_hdma.Instance->CNDTR;
+    uint16_t cur = (uint16_t)(RX_DMA_BUF_SIZE - ndtr);  /* DMA write pos */
+    uint16_t produced = (uint16_t)(cur - s_dma_last_pos);
+    uint16_t i;
+
+    if (produced == 0U)
+    {
+        return;
+    }
+    for (i = 0U; i < produced; i++)
+    {
+        uint16_t idx = (uint16_t)((s_dma_last_pos + i) % RX_DMA_BUF_SIZE);
+        if (RING_Push(&s_ring, s_dma_buf[idx]) == 0U)
+        {
+            break;   /* ring full: drop overflow (cannot happen at 115k) */
+        }
+    }
+    s_dma_last_pos = (uint16_t)((s_dma_last_pos + produced) % RX_DMA_BUF_SIZE);
+    s_last_byte_us = BSP_Tick_GetUs();
+}
+#endif
+
+void BSP_UART_RxDmaService(void)
+{
+#if (RS485_RX_MODE == 1)
+    uint32_t now_us = BSP_Tick_GetUs();
+
+    if (!RING_Empty(&s_ring) &&
+        ((uint32_t)(now_us - s_last_byte_us) >= s_t35_us))
+    {
+        /* idle long enough: one complete frame is buffered */
+        uint8_t frame[RX_MAX_FRAME_LEN];
+        uint16_t len = 0U;
+        uint8_t b;
+
+        while ((len < sizeof(frame)) && RING_Pop(&s_ring, &b))
+        {
+            frame[len++] = b;
+        }
+        if ((len > 0U) && (s_frame_cb != 0))
+        {
+            s_frame_cb(frame, len, now_us);
+        }
+    }
+#endif
+}
+
+/*====================================================================*/
+/* USART ISR                                                           */
+/*====================================================================*/
 void BSP_UART_IRQHandler(void)
 {
     uint32_t isr = RS485_UART_PERIPH->ISR;
 
+#if (RS485_RX_MODE == 1)
+    /* IDLE line: one frame arrived completely -> pull into ring */
+    if ((isr & USART_ISR_IDLE) != 0U)
+    {
+        RS485_UART_PERIPH->ICR = USART_ICR_IDLECF;
+        DMA_RingPull();
+    }
+    /* ORE possible when DMA is slow to drain - discard and continue */
+    if ((isr & USART_ISR_ORE) != 0U)
+    {
+        (void)RS485_UART_PERIPH->RDR;
+        RS485_UART_PERIPH->ICR = USART_ICR_ORECF;
+    }
+#else
     /* Overrun error: read RDR to discard, keep receiver alive */
     if ((isr & USART_ISR_ORE) != 0U)
     {
@@ -138,6 +279,7 @@ void BSP_UART_IRQHandler(void)
             s_rx_cb(byte);
         }
     }
+#endif
 }
 
 /*====================================================================*/

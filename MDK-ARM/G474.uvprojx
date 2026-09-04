@@ -586,6 +586,16 @@
           </Files>
         </Group>
         <Group>
+          <GroupName>Modbus/Common</GroupName>
+          <Files>
+            <File>
+              <FileName>ring_buffer.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Common\ring_buffer.c</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
           <GroupName>Modbus/Protocol</GroupName>
           <Files>
             <File>

@@ -53,6 +53,15 @@ void MB_Slave_SetEventCallback(mb_slave_event_cb_t cb);
 void MB_Slave_OnRxByte(uint8_t byte, uint32_t now_us);
 
 /**
+  * @brief  Feed one complete frame (DMA mode; call from main loop).
+  *         The frame is validated and answered synchronously.
+  * @param  frame  complete RTU frame incl. CRC
+  * @param  len    total frame length
+  * @retval 1 when a response was sent
+  */
+uint8_t MB_Slave_OnRxFrame(const uint8_t *frame, uint16_t len);
+
+/**
   * @brief  Poll the receive state machine. Call very often from main loop.
   * @param  now_us  current us timestamp
   * @retval 1 when a response was sent during this poll, 0 otherwise

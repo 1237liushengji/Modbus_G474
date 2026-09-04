@@ -16,6 +16,7 @@
 
 #include "led.h"
 #include "bsp_rs485.h"
+#include "bsp_uart.h"
 #include "bsp_tick.h"
 #include "bsp_board_cfg.h"
 #include "bsp_w25q128.h"
@@ -46,10 +47,25 @@ static volatile uint32_t s_poll_count    = 0U;
 static uint8_t s_target_slave = MASTER_SLAVE_ID_DEFAULT;
 static comm_stats_t s_stats_disp;
 
+static void Master_OnFinished(void);   /* fwd decl */
+
 static void RSCB_MasterRx(uint8_t byte)
 {
     MB_Master_OnRxByte(byte, BSP_Tick_GetUs());
 }
+
+#if (RS485_RX_MODE == 1)
+/* DMA mode: whole response frames arrive from BSP_UART_RxDmaService() */
+static void RSCB_MasterRxFrame(const uint8_t *frame, uint16_t len,
+                               uint32_t now_us)
+{
+    (void)now_us;
+    if (MB_Master_OnRxFrame(frame, len) != 0U)
+    {
+        Master_OnFinished();
+    }
+}
+#endif
 
 static void Master_LogEvent(uint8_t event, uint16_t param)
 {
@@ -111,6 +127,9 @@ void Master_Main(void)
 
     RS485_Init(baud);
     RS485_SetRxCallback(RSCB_MasterRx);
+#if (RS485_RX_MODE == 1)
+    RS485_SetRxFrameCallback(RSCB_MasterRxFrame);
+#endif
 
     MB_Master_Init(s_target_slave, baud, MASTER_TIMEOUT_MS, MASTER_RETRY_MAX);
     MB_Master_SetTxFunc(RS485_SendFrame);
@@ -140,10 +159,16 @@ void Master_Main(void)
             }
         }
 
+        /* protocol state machine: drives SEND + timeout/retry in both modes */
         if (MB_Master_Poll(BSP_Tick_GetUs()))
         {
             Master_OnFinished();
         }
+
+#if (RS485_RX_MODE == 1)
+        /* DMA mode: service delivers complete response frames */
+        BSP_UART_RxDmaService();
+#endif
 
         /* LED decay: blink blue = ok pulse, green fast blink = link down */
         if ((HAL_GetTick() - s_fault_led_ms) >= 100U)

@@ -64,6 +64,17 @@ void MB_Master_OnRxByte(uint8_t byte, uint32_t now_us);
   */
 uint8_t MB_Master_Poll(uint32_t now_us);
 
+/** Feed received bytes (call from UART RX ISR, interrupt mode). */
+void MB_Master_OnRxByte(uint8_t byte, uint32_t now_us);
+
+/**
+  * @brief  Feed one complete response frame (DMA mode; main-loop context).
+  * @param  frame  complete RTU frame incl. CRC
+  * @param  len
+  * @retval 1 when a response was processed
+  */
+uint8_t MB_Master_OnRxFrame(const uint8_t *frame, uint16_t len);
+
 /** Last finished result. */
 const mb_master_result_t *MB_Master_GetResult(void);
 

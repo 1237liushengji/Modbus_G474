@@ -109,6 +109,19 @@ static void RSCB_SlaveRx(uint8_t byte)
     MB_Slave_OnRxByte(byte, BSP_Tick_GetUs());
 }
 
+#if (RS485_RX_MODE == 1)
+/* DMA mode: whole frames arrive from BSP_UART_RxDmaService() */
+static void RSCB_SlaveRxFrame(const uint8_t *frame, uint16_t len,
+                              uint32_t now_us)
+{
+    (void)now_us;
+    if (MB_Slave_OnRxFrame(frame, len) != 0U)
+    {
+        LED2_Toggle;   /* response sent */
+    }
+}
+#endif
+
 /* defined below, used in the main loop */
 static void Slave_ApplyConfigChange(void);
 
@@ -370,6 +383,9 @@ void Slave_Main(void)
 
     RS485_Init(baud);
     RS485_SetRxCallback(RSCB_SlaveRx);
+#if (RS485_RX_MODE == 1)
+    RS485_SetRxFrameCallback(RSCB_SlaveRxFrame);
+#endif
 
     MB_Slave_Init(slave_id, baud);
     MB_Slave_SetTxFunc(RS485_SendFrame);
@@ -392,10 +408,14 @@ void Slave_Main(void)
     while (1)
     {
         /* Modbus engine */
+#if (RS485_RX_MODE == 1)
+        BSP_UART_RxDmaService();   /* delivers frames -> RxFrame callback */
+#else
         if (MB_Slave_Poll(BSP_Tick_GetUs()) != 0U)
         {
             LED2_Toggle;   /* response sent */
         }
+#endif
 
         /* keys every ~5 ms */
         kev = KEY_Scan(&key);

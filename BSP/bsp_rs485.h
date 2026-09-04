@@ -17,6 +17,10 @@
 /* RX byte callback (ISR context), wired to BSP_UART callback. */
 typedef void (*rs485_rx_cb_t)(uint8_t byte);
 
+/* RX frame callback (DMA mode, main-loop context). */
+typedef void (*rs485_rx_frame_cb_t)(const uint8_t *frame, uint16_t len,
+                                    uint32_t now_us);
+
 /**
   * @brief  Initialize RS485 link (UART + optional DE GPIO). Default: RX mode.
   * @param  baudrate
@@ -48,6 +52,11 @@ void RS485_SendFrame(const uint8_t *data, uint16_t len);
   * @brief  Register RX byte callback (delivered in USART ISR).
   */
 void RS485_SetRxCallback(rs485_rx_cb_t cb);
+
+/**
+  * @brief  Register RX frame callback (DMA mode; main-loop context).
+  */
+void RS485_SetRxFrameCallback(rs485_rx_frame_cb_t cb);
 
 /**
   * @brief  RX statistics hook used by tests: returns bytes received so far.
