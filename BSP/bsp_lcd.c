@@ -31,7 +31,8 @@ const uint16_t LCD_WIDTH  = 240;      /* portrait: 240 px wide            */
 const uint16_t LCD_HEIGHT = 280;      /* visible 280 px of the 320 GRAM   */
 #define LCD_X_OFFSET   0U             /* controller X origin offset       */
 #define LCD_Y_OFFSET   20U            /* panel starts 20 px into GRAM     */
-#define LCD_MADCTL_VAL 0x00U          /* portrait, top->bottom, RGB       */
+#define LCD_MADCTL_VAL 0xC0U          /* portrait flipped (MY|MX), RGB     */
+                                      /* = vendor Direction_V_Flip         */
 #elif (LCD_CTRL_SELECT == 1)
 const uint16_t LCD_WIDTH  = 240;
 const uint16_t LCD_HEIGHT = 320;
