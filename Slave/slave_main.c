@@ -409,6 +409,10 @@ static void UI_Update(void)
     {
         s_ui_redraw = 0U;
         s_ui_last_ms = now;
+        /* clear whole screen first so no remnants of the previous page
+           stay visible (labels of the old page are not overwritten by
+           the new page's sparse label layout) */
+        LCD_Clear();
         if (s_page == UI_PAGE_CONFIG)
         {
             UI_DrawConfigFull();   /* labels + values, single shot */
