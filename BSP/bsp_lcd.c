@@ -18,24 +18,41 @@
 /* Controller geometry & config                                        */
 /*====================================================================*/
 /* LCD_CTRL_SELECT defined in bsp_board_cfg.h:
-   0 = ST7789 (240x240), 1 = ILI9341 (240x320), 2 = ST7735 (128x160)  */
+   0 = ST7789 240x280 (1.69 inch, GRAM 240x320, visible y-offset 20)
+   1 = ILI9341 (240x320), 2 = ST7735 (128x160)
+   Geometry & offsets are tuned for the Genbotter 1.69" 240x280 panel. */
+
 #ifndef LCD_CTRL_SELECT
 #define LCD_CTRL_SELECT   0
 #endif
 
 #if   (LCD_CTRL_SELECT == 0)
-const uint16_t LCD_WIDTH  = 240;
-const uint16_t LCD_HEIGHT = 240;
+const uint16_t LCD_WIDTH  = 240;      /* portrait: 240 px wide            */
+const uint16_t LCD_HEIGHT = 280;      /* visible 280 px of the 320 GRAM   */
+#define LCD_X_OFFSET   0U             /* controller X origin offset       */
+#define LCD_Y_OFFSET   20U            /* panel starts 20 px into GRAM     */
+#define LCD_MADCTL_VAL 0x00U          /* portrait, top->bottom, RGB       */
 #elif (LCD_CTRL_SELECT == 1)
 const uint16_t LCD_WIDTH  = 240;
 const uint16_t LCD_HEIGHT = 320;
+#define LCD_X_OFFSET   0U
+#define LCD_Y_OFFSET   0U
+#define LCD_MADCTL_VAL 0x40U          /* landscape for ILI9341            */
 #else
 const uint16_t LCD_WIDTH  = 128;
 const uint16_t LCD_HEIGHT = 160;
+#define LCD_X_OFFSET   0U
+#define LCD_Y_OFFSET   0U
+#define LCD_MADCTL_VAL 0x00U
 #endif
 
-const uint8_t LCD_CHAR_COLS = (uint8_t)(LCD_WIDTH / 6U);    /* 6 px / char  */
-const uint8_t LCD_CHAR_ROWS = (uint8_t)(LCD_HEIGHT / 8U);   /* 8 px / row   */
+/* font scale: 5x7 glyph drawn at 2x -> 10x14 + 2px cell gap => 12x16 */
+#define LCD_FONT_SCALE      2U
+#define LCD_CHAR_CELL_W     (6U * LCD_FONT_SCALE)   /* 12 px */
+#define LCD_CHAR_CELL_H     (8U * LCD_FONT_SCALE)   /* 16 px */
+
+const uint8_t LCD_CHAR_COLS = (uint8_t)(LCD_WIDTH / LCD_CHAR_CELL_W);  /* 20 */
+const uint8_t LCD_CHAR_ROWS = (uint8_t)(LCD_HEIGHT / LCD_CHAR_CELL_H); /* 17 */
 
 /*====================================================================*/
 /* Soft SPI primitives (pins come from bsp_board_cfg.h)                */
@@ -53,7 +70,7 @@ const uint8_t LCD_CHAR_ROWS = (uint8_t)(LCD_HEIGHT / 8U);   /* 8 px / row   */
 
 static void LCD_SoftDelay(void)
 {
-    volatile uint32_t n = 40U;
+    volatile uint32_t n = 10U;   /* ~0.1us @170MHz: safe for ST7789 soft SPI */
     while (n-- > 0U)
     {
     }
@@ -104,27 +121,40 @@ static void LCD_WriteData16(uint16_t dat)
 /*====================================================================*/
 static void LCD_InitSequence(void)
 {
-#if   (LCD_CTRL_SELECT == 0)   /* ST7789 */
-    LCD_WriteCmd(0x01);                 /* SWRESET */
-    HAL_Delay(150);
-    LCD_WriteCmd(0x11);                 /* SLPOUT */
-    HAL_Delay(120);
-    LCD_WriteCmd(0x36); LCD_WriteData(0x00);          /* MADCTL */
+#if   (LCD_CTRL_SELECT == 0)   /* ST7789 240x280 - mirror vendor example */
+    LCD_WriteCmd(0x36); LCD_WriteData(LCD_MADCTL_VAL);  /* MADCTL portrait */
     LCD_WriteCmd(0x3A); LCD_WriteData(0x05);          /* COLMOD 16bit */
     LCD_WriteCmd(0xB2); LCD_WriteData(0x0C); LCD_WriteData(0x0C);
                         LCD_WriteData(0x00); LCD_WriteData(0x33);
                         LCD_WriteData(0x33);
-    LCD_WriteCmd(0xB7); LCD_WriteData(0x35);
-    LCD_WriteCmd(0xBB); LCD_WriteData(0x19);
+    LCD_WriteCmd(0xB7); LCD_WriteData(0x35);          /* VGH/VGL */
+    LCD_WriteCmd(0xBB); LCD_WriteData(0x19);          /* VCOM */
     LCD_WriteCmd(0xC0); LCD_WriteData(0x2C);
     LCD_WriteCmd(0xC2); LCD_WriteData(0x01);
-    LCD_WriteCmd(0xC3); LCD_WriteData(0x12);
-    LCD_WriteCmd(0xC4); LCD_WriteData(0x20);
-    LCD_WriteCmd(0xC6); LCD_WriteData(0x0F);
+    LCD_WriteCmd(0xC3); LCD_WriteData(0x12);          /* VRH */
+    LCD_WriteCmd(0xC4); LCD_WriteData(0x20);          /* VDV */
+    LCD_WriteCmd(0xC6); LCD_WriteData(0x0F);          /* 60 Hz */
     LCD_WriteCmd(0xD0); LCD_WriteData(0xA4); LCD_WriteData(0xA1);
-    LCD_WriteCmd(0x20);                 /* INVOFF */
+    /* vendor gamma */
+    LCD_WriteCmd(0xE0); LCD_WriteData(0xD0); LCD_WriteData(0x04);
+                        LCD_WriteData(0x0D); LCD_WriteData(0x11);
+                        LCD_WriteData(0x13); LCD_WriteData(0x2B);
+                        LCD_WriteData(0x3F); LCD_WriteData(0x54);
+                        LCD_WriteData(0x4C); LCD_WriteData(0x18);
+                        LCD_WriteData(0x0D); LCD_WriteData(0x0B);
+                        LCD_WriteData(0x1F); LCD_WriteData(0x23);
+    LCD_WriteCmd(0xE1); LCD_WriteData(0xD0); LCD_WriteData(0x04);
+                        LCD_WriteData(0x0C); LCD_WriteData(0x11);
+                        LCD_WriteData(0x13); LCD_WriteData(0x2C);
+                        LCD_WriteData(0x3F); LCD_WriteData(0x44);
+                        LCD_WriteData(0x51); LCD_WriteData(0x2F);
+                        LCD_WriteData(0x1F); LCD_WriteData(0x1F);
+                        LCD_WriteData(0x20); LCD_WriteData(0x23);
+    LCD_WriteCmd(0x21);                 /* INVON: panel is normally black */
+    LCD_WriteCmd(0x11);                 /* SLPOUT */
+    HAL_Delay(120);
     LCD_WriteCmd(0x29);                 /* DISPON */
-    HAL_Delay(100);
+    HAL_Delay(50);
 
 #elif (LCD_CTRL_SELECT == 1)   /* ILI9341 */
     LCD_WriteCmd(0x01);
@@ -213,9 +243,11 @@ static void LCD_InitSequence(void)
 static void LCD_SetWindow(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1)
 {
     LCD_WriteCmd(0x2A);                 /* CASET */
-    LCD_WriteData16(x0); LCD_WriteData16(x1);
+    LCD_WriteData16((uint16_t)(x0 + LCD_X_OFFSET));
+    LCD_WriteData16((uint16_t)(x1 + LCD_X_OFFSET));
     LCD_WriteCmd(0x2B);                 /* RASET */
-    LCD_WriteData16(y0); LCD_WriteData16(y1);
+    LCD_WriteData16((uint16_t)(y0 + LCD_Y_OFFSET));
+    LCD_WriteData16((uint16_t)(y1 + LCD_Y_OFFSET));
     LCD_WriteCmd(0x2C);                 /* RAMWR */
 }
 
@@ -288,6 +320,26 @@ void LCD_Clear(void)
     LCD_Fill(LCD_COLOR_BLACK);
 }
 
+void LCD_ClearRow(uint8_t row, uint16_t color)
+{
+    uint32_t total = (uint32_t)LCD_WIDTH * LCD_CHAR_CELL_H;
+    uint16_t x = 0U;
+    uint16_t y = (uint16_t)row * LCD_CHAR_CELL_H;
+
+    if (row >= LCD_CHAR_ROWS)
+    {
+        return;
+    }
+    LCD_CS_LOW();
+    LCD_SetWindow(x, y, (uint16_t)(LCD_WIDTH - 1U),
+                  (uint16_t)(y + LCD_CHAR_CELL_H - 1U));
+    while (total-- > 0U)
+    {
+        LCD_PushPixel(color);
+    }
+    LCD_CS_HIGH();
+}
+
 /*====================================================================*/
 /* 5x7 ASCII font (columns; bit7..bit1 = rows 0..6, bit0 unused)        */
 /*====================================================================*/
@@ -342,13 +394,14 @@ static const uint8_t s_font5x7[96][5] = {
     {0x08,0x04,0x08,0x10,0x08},{0xFF,0xFF,0xFF,0xFF,0xFF}
 };
 
+/* Draw one character in a 12x16 cell: 5x7 glyph scaled x2 (10x14)
+   plus 2px right/bottom spacing. Pixel loop: 12x16 = 192 pixels. */
 static void LCD_DrawChar(uint16_t x, uint16_t y, char ch,
                          uint16_t fg, uint16_t bg)
 {
     const uint8_t *glyph;
-    uint8_t col;
-    uint8_t row;
-    uint16_t px;
+    uint16_t cy;    /* cell row    */
+    uint16_t cx;    /* cell column */
 
     if ((ch < 0x20) || (ch > 0x7E))
     {
@@ -357,22 +410,31 @@ static void LCD_DrawChar(uint16_t x, uint16_t y, char ch,
     glyph = s_font5x7[ch - 0x20];
 
     LCD_CS_LOW();
-    LCD_SetWindow(x, y, (uint16_t)(x + 4U), (uint16_t)(y + 7U));
+    LCD_SetWindow(x, y, (uint16_t)(x + LCD_CHAR_CELL_W - 1U),
+                  (uint16_t)(y + LCD_CHAR_CELL_H - 1U));
 
-    for (col = 0; col < 5U; col++)
+    for (cy = 0U; cy < LCD_CHAR_CELL_H; cy++)
     {
-        uint8_t bits = glyph[col];
-        for (row = 0; row < 8U; row++)
+        /* glyph row: 7 rows x2 = 14, rows 14..15 stay background */
+        uint16_t gr = cy / LCD_FONT_SCALE;
+        uint16_t in_glyph_row = (cy < (7U * LCD_FONT_SCALE)) ? 1U : 0U;
+
+        for (cx = 0U; cx < LCD_CHAR_CELL_W; cx++)
         {
-            if (row < 7U)
+            uint16_t px;
+            uint16_t gc = cx / LCD_FONT_SCALE;
+            uint16_t in_glyph_col = (cx < (5U * LCD_FONT_SCALE)) ? 1U : 0U;
+
+            if (in_glyph_row && in_glyph_col &&
+                ((glyph[gc] & (0x40U >> gr)) != 0U))
             {
-                px = ((bits & (0x40U >> row)) != 0U) ? fg : bg;
+                px = fg;
             }
             else
             {
-                px = bg;    /* bottom spacing row */
+                px = bg;
             }
-            LCD_PushPixel(px);
+            LCD_PushPixel((uint16_t)px);
         }
     }
     LCD_CS_HIGH();
@@ -381,8 +443,8 @@ static void LCD_DrawChar(uint16_t x, uint16_t y, char ch,
 void LCD_Print(uint8_t row, uint8_t col, const char *text,
                uint16_t fg, uint16_t bg)
 {
-    uint16_t x = (uint16_t)col * 6U;
-    uint16_t y = (uint16_t)row * 8U;
+    uint16_t x = (uint16_t)col * LCD_CHAR_CELL_W;
+    uint16_t y = (uint16_t)row * LCD_CHAR_CELL_H;
 
     if (row >= LCD_CHAR_ROWS)
     {
@@ -395,7 +457,7 @@ void LCD_Print(uint8_t row, uint8_t col, const char *text,
             break;
         }
         LCD_DrawChar(x, y, *text, fg, bg);
-        x += 6U;
+        x += LCD_CHAR_CELL_W;
         col++;
         text++;
     }

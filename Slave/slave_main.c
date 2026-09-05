@@ -128,69 +128,70 @@ static void Slave_ApplyConfigChange(void);
 /*====================================================================*/
 /* Home page                                                           */
 /*====================================================================*/
+/* 20 columns x 17 rows layout for the 240x280 panel                   */
+static const char s_line[] = "--------------------";
+
 static void UI_DrawHome(void)
 {
     char buf[32];
     comm_stats_t st;
-    char idbuf[4];
-    char bbuf[7];
+    char idbuf[8];
+    char bbuf[8];
 
     U16ToStr(MB_REG_GetSlaveId(), idbuf);
     U16ToStr(MB_REG_BaudFromIdx((uint8_t)MB_REG_GetBaudIdx()), bbuf);
 
-    LCD_Print(0, 9, "MODBUS SLAVE", LCD_COLOR_WHITE, LCD_COLOR_BLACK);
+    LCD_Print(0, 3, "MODBUS SLAVE", LCD_COLOR_WHITE, LCD_COLOR_BLACK);
     buf[0] = 'I'; buf[1] = 'D'; buf[2] = ':'; buf[3] = '\0';
     strcat(buf, idbuf);
     strcat(buf, "  ");
     strcat(buf, bbuf);
-    LCD_Print(1, 5, buf, LCD_COLOR_YELLOW, LCD_COLOR_BLACK);
-    LCD_Print(2, 0, "----------------", LCD_COLOR_GRAY, LCD_COLOR_BLACK);
+    LCD_Print(1, 3, buf, LCD_COLOR_YELLOW, LCD_COLOR_BLACK);
+    LCD_Print(2, 0, s_line, LCD_COLOR_GRAY, LCD_COLOR_BLACK);
 
-    U16ToStr1(s_demo_temp, buf);
-    strcat(buf, " C");
-    LCD_Print(3, 1, "TEMP:", LCD_COLOR_WHITE, LCD_COLOR_BLACK);
-    LCD_Print(3, 12, buf, LCD_COLOR_WHITE, LCD_COLOR_BLACK);
+    U16ToStr1(s_demo_temp, buf);   strcat(buf, " C");
+    LCD_Print(3, 0, "TEMP:", LCD_COLOR_WHITE, LCD_COLOR_BLACK);
+    LCD_Print(3, 8, buf, LCD_COLOR_WHITE, LCD_COLOR_BLACK);
 
-    U16ToStr1(s_demo_humi, buf);
-    strcat(buf, " %");
-    LCD_Print(4, 1, "HUMI:", LCD_COLOR_WHITE, LCD_COLOR_BLACK);
-    LCD_Print(4, 12, buf, LCD_COLOR_WHITE, LCD_COLOR_BLACK);
+    U16ToStr1(s_demo_humi, buf);   strcat(buf, " %");
+    LCD_Print(4, 0, "HUMI:", LCD_COLOR_WHITE, LCD_COLOR_BLACK);
+    LCD_Print(4, 8, buf, LCD_COLOR_WHITE, LCD_COLOR_BLACK);
 
-    U16ToStr1(s_demo_volt, buf);
-    strcat(buf, " V");
-    LCD_Print(5, 1, "VOLT:", LCD_COLOR_WHITE, LCD_COLOR_BLACK);
-    LCD_Print(5, 12, buf, LCD_COLOR_WHITE, LCD_COLOR_BLACK);
+    U16ToStr1(s_demo_volt, buf);   strcat(buf, " V");
+    LCD_Print(5, 0, "VOLT:", LCD_COLOR_WHITE, LCD_COLOR_BLACK);
+    LCD_Print(5, 8, buf, LCD_COLOR_WHITE, LCD_COLOR_BLACK);
 
-    U16ToStr1(s_demo_curr, buf);
-    strcat(buf, " A");
-    LCD_Print(6, 1, "CURR:", LCD_COLOR_WHITE, LCD_COLOR_BLACK);
-    LCD_Print(6, 12, buf, LCD_COLOR_WHITE, LCD_COLOR_BLACK);
+    U16ToStr1(s_demo_curr, buf);   strcat(buf, " A");
+    LCD_Print(6, 0, "CURR:", LCD_COLOR_WHITE, LCD_COLOR_BLACK);
+    LCD_Print(6, 8, buf, LCD_COLOR_WHITE, LCD_COLOR_BLACK);
 
-    LCD_Print(8, 0, "----------------", LCD_COLOR_GRAY, LCD_COLOR_BLACK);
+    LCD_Print(7, 0, s_line, LCD_COLOR_GRAY, LCD_COLOR_BLACK);
 
-    /* counters */
-    U16ToStr(MB_REG_GetHolding(MB_REG_HOLD_RXCNT), buf);
-    LCD_Print(9, 1, "RX:", LCD_COLOR_GREEN, LCD_COLOR_BLACK);
-    LCD_Print(9, 12, buf, LCD_COLOR_GREEN, LCD_COLOR_BLACK);
-
-    U16ToStr(MB_REG_GetHolding(MB_REG_HOLD_TXCNT), buf);
-    LCD_Print(10, 1, "TX:", LCD_COLOR_GREEN, LCD_COLOR_BLACK);
-    LCD_Print(10, 12, buf, LCD_COLOR_GREEN, LCD_COLOR_BLACK);
+    /* counters: RX/TX on one line, CRC/EXC on the next */
+    U16ToStr(MB_REG_GetHolding(MB_REG_HOLD_RXCNT), idbuf);
+    U16ToStr(MB_REG_GetHolding(MB_REG_HOLD_TXCNT), bbuf);
+    LCD_Print(9, 0, "RX:", LCD_COLOR_GREEN, LCD_COLOR_BLACK);
+    LCD_Print(9, 4, idbuf, LCD_COLOR_GREEN, LCD_COLOR_BLACK);
+    LCD_Print(9, 11, "TX:", LCD_COLOR_GREEN, LCD_COLOR_BLACK);
+    LCD_Print(9, 15, bbuf, LCD_COLOR_GREEN, LCD_COLOR_BLACK);
 
     MB_Slave_GetStats(&st);
-    U16ToStr(st.crc_error_count, buf);
-    LCD_Print(11, 1, "CRC:", LCD_COLOR_RED, LCD_COLOR_BLACK);
-    LCD_Print(11, 12, buf, LCD_COLOR_RED, LCD_COLOR_BLACK);
+    U16ToStr(st.crc_error_count, idbuf);
+    U16ToStr(st.exception_count, bbuf);
+    LCD_Print(10, 0, "CRC:", LCD_COLOR_RED, LCD_COLOR_BLACK);
+    LCD_Print(10, 5, idbuf, LCD_COLOR_RED, LCD_COLOR_BLACK);
+    LCD_Print(10, 11, "EXC:", LCD_COLOR_RED, LCD_COLOR_BLACK);
+    LCD_Print(10, 16, bbuf, LCD_COLOR_RED, LCD_COLOR_BLACK);
 
     /* status line */
-    LCD_Print(13, 1, "STATUS:", LCD_COLOR_WHITE, LCD_COLOR_BLACK);
+    LCD_Print(12, 0, "STATUS:", LCD_COLOR_WHITE, LCD_COLOR_BLACK);
     if (MB_REG_GetHolding(MB_REG_HOLD_STATUS) == 1U)
     {
-        LCD_Print(13, 12, "OK", LCD_COLOR_GREEN, LCD_COLOR_BLACK);
+        LCD_Print(12, 9, "OK", LCD_COLOR_GREEN, LCD_COLOR_BLACK);
     }
     else
     {
-        LCD_Print(13, 12, "WARN", LCD_COLOR_YELLOW, LCD_COLOR_BLACK);
+        LCD_Print(12, 9, "WARN", LCD_COLOR_YELLOW, LCD_COLOR_BLACK);
     }
     LCD_Print(15, 0, "K0:next K1:edit", LCD_COLOR_GRAY, LCD_COLOR_BLACK);
 }
@@ -204,26 +205,26 @@ static void UI_DrawError(void)
     comm_stats_t st;
 
     MB_Slave_GetStats(&st);
-    LCD_Print(0, 8, "ERROR PAGE", LCD_COLOR_RED, LCD_COLOR_BLACK);
-    LCD_Print(1, 0, "----------------", LCD_COLOR_GRAY, LCD_COLOR_BLACK);
+    LCD_Print(0, 5, "ERROR PAGE", LCD_COLOR_RED, LCD_COLOR_BLACK);
+    LCD_Print(1, 0, s_line, LCD_COLOR_GRAY, LCD_COLOR_BLACK);
 
     U16ToStr(st.crc_error_count, buf);
-    LCD_Print(2, 1, "CRC ERROR :", LCD_COLOR_WHITE, LCD_COLOR_BLACK);
+    LCD_Print(2, 0, "CRC ERROR :", LCD_COLOR_WHITE, LCD_COLOR_BLACK);
     LCD_Print(2, 12, buf, LCD_COLOR_RED, LCD_COLOR_BLACK);
 
     U16ToStr(st.exception_count, buf);
-    LCD_Print(3, 1, "EXCEPTION :", LCD_COLOR_WHITE, LCD_COLOR_BLACK);
+    LCD_Print(3, 0, "EXCEPTION :", LCD_COLOR_WHITE, LCD_COLOR_BLACK);
     LCD_Print(3, 12, buf, LCD_COLOR_RED, LCD_COLOR_BLACK);
 
     U16ToStr(MB_REG_GetHolding(MB_REG_HOLD_RXCNT), buf);
-    LCD_Print(4, 1, "RX TOTAL  :", LCD_COLOR_WHITE, LCD_COLOR_BLACK);
+    LCD_Print(4, 0, "RX TOTAL  :", LCD_COLOR_WHITE, LCD_COLOR_BLACK);
     LCD_Print(4, 12, buf, LCD_COLOR_WHITE, LCD_COLOR_BLACK);
 
     U16ToStr(MB_REG_GetHolding(MB_REG_HOLD_ERRCODE), buf);
-    LCD_Print(5, 1, "LAST ERR  :", LCD_COLOR_WHITE, LCD_COLOR_BLACK);
+    LCD_Print(5, 0, "LAST ERR  :", LCD_COLOR_WHITE, LCD_COLOR_BLACK);
     LCD_Print(5, 12, buf, LCD_COLOR_YELLOW, LCD_COLOR_BLACK);
 
-    LCD_Print(7, 0, "K0:next page", LCD_COLOR_GRAY, LCD_COLOR_BLACK);
+    LCD_Print(8, 0, "K0:next page", LCD_COLOR_GRAY, LCD_COLOR_BLACK);
 }
 
 /*====================================================================*/
@@ -263,8 +264,8 @@ static void UI_DrawConfig(void)
     uint8_t i;
     uint16_t val;
 
-    LCD_Print(0, 9, "CONFIG PAGE", LCD_COLOR_CYAN, LCD_COLOR_BLACK);
-    LCD_Print(1, 0, "----------------", LCD_COLOR_GRAY, LCD_COLOR_BLACK);
+    LCD_Print(0, 5, "CONFIG PAGE", LCD_COLOR_CYAN, LCD_COLOR_BLACK);
+    LCD_Print(1, 0, s_line, LCD_COLOR_GRAY, LCD_COLOR_BLACK);
 
     for (i = 0; i < CFG_ITEM_COUNT; i++)
     {
@@ -272,9 +273,9 @@ static void UI_DrawConfig(void)
         uint16_t bg = (s_editing && (i == s_cfg_cursor)) ? LCD_COLOR_YELLOW : LCD_COLOR_BLACK;
 
         val = MB_REG_GetHolding(s_cfg_items[i].addr);
-        LCD_Print((uint8_t)(2 + i), 1, s_cfg_items[i].name, fg, bg);
+        LCD_Print((uint8_t)(2 + i), 0, s_cfg_items[i].name, fg, bg);
         U16ToStr(val, buf);
-        LCD_Print((uint8_t)(2 + i), 16, buf, fg, bg);
+        LCD_Print((uint8_t)(2 + i), 13, buf, fg, bg);
     }
 
     if (s_editing)

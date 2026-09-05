@@ -1,17 +1,17 @@
 /**
   ******************************************************************************
   * @file    bsp_lcd.h
-  * @brief   SPI TFT LCD driver (soft SPI) - ST7789 / ILI9341 / ST7735 selectable.
+  * @brief   SPI TFT LCD driver (soft SPI) - ST7789 240x280 (1.69") primary.
   *
-  *  Board wiring (Genbotter G474):
+  *  Board wiring (Genbotter G474, matches vendor example E:\...\2.参考例程\6.LCD):
   *    LCD_CS  PD11   LCD_SCL PB3   LCD_SDA PB5   LCD_DC PD12   LCD_BL PD13
   *
-  *  Controller selected by LCD_CONTROLLER in bsp_board_cfg.h:
-  *    0 = ST7789 (default, 240x240)
+  *  Controller selected by LCD_CTRL_SELECT in bsp_board_cfg.h:
+  *    0 = ST7789 240x280 (default; GRAM 240x320, visible offset +20 Y)
   *    1 = ILI9341 (240x320)
   *    2 = ST7735  (128x160)
   *
-  *  Text UI helpers draw 5x7 ASCII font, one char cell = 6x8 px.
+  *  Text UI: 5x7 ASCII font scaled x2 => char cell = 12x16 px.
   ******************************************************************************
   */
 #ifndef __BSP_LCD_H
@@ -43,6 +43,9 @@ void LCD_Clear(void);
   */
 void LCD_Print(uint8_t row, uint8_t col, const char *text,
                uint16_t fg, uint16_t bg);
+
+/** Fill one whole char row with a color (fast row erase). */
+void LCD_ClearRow(uint8_t row, uint16_t color);
 
 /** Screen geometry (depends on controller). */
 extern const uint16_t LCD_WIDTH;
