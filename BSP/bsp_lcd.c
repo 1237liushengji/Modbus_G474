@@ -57,45 +57,45 @@ const uint8_t LCD_CHAR_COLS = (uint8_t)(LCD_WIDTH / LCD_CHAR_CELL_W);  /* 20 */
 const uint8_t LCD_CHAR_ROWS = (uint8_t)(LCD_HEIGHT / LCD_CHAR_CELL_H); /* 17 */
 
 /*====================================================================*/
-/* Soft SPI primitives (pins come from bsp_board_cfg.h)                */
-/*====================================================================*/
-#define LCD_CS_LOW()   HAL_GPIO_WritePin(LCD_CS_PORT, LCD_CS_PIN, GPIO_PIN_RESET)
-#define LCD_CS_HIGH()  HAL_GPIO_WritePin(LCD_CS_PORT, LCD_CS_PIN, GPIO_PIN_SET)
-#define LCD_SCL_LOW()  HAL_GPIO_WritePin(LCD_SCL_PORT, LCD_SCL_PIN, GPIO_PIN_RESET)
-#define LCD_SCL_HIGH() HAL_GPIO_WritePin(LCD_SCL_PORT, LCD_SCL_PIN, GPIO_PIN_SET)
-#define LCD_SDA_LOW()  HAL_GPIO_WritePin(LCD_SDA_PORT, LCD_SDA_PIN, GPIO_PIN_RESET)
-#define LCD_SDA_HIGH() HAL_GPIO_WritePin(LCD_SDA_PORT, LCD_SDA_PIN, GPIO_PIN_SET)
-#define LCD_DC_LOW()   HAL_GPIO_WritePin(LCD_DC_PORT, LCD_DC_PIN, GPIO_PIN_RESET)
-#define LCD_DC_HIGH()  HAL_GPIO_WritePin(LCD_DC_PORT, LCD_DC_PIN, GPIO_PIN_SET)
-#define LCD_BL_ON()    HAL_GPIO_WritePin(LCD_BL_PORT, LCD_BL_PIN, GPIO_PIN_SET)
-#define LCD_BL_OFF()   HAL_GPIO_WritePin(LCD_BL_PORT, LCD_BL_PIN, GPIO_PIN_RESET)
-
-static void LCD_SoftDelay(void)
-{
-    volatile uint32_t n = 10U;   /* ~0.1us @170MHz: safe for ST7789 soft SPI */
-    while (n-- > 0U)
-    {
-    }
-}
+/* Soft SPI primitives (pins come from bsp_board_cfg.h)
+ *
+ * Performance: HAL_GPIO_WritePin() is slow (~50ns+ per call with arg
+ * checking). The screen is a soft-SPI device and whole-screen fills push
+ * 240x280x16 = ~1M bits, so we write GPIO registers directly (BSRR/BRR).
+ * SCL(PB3) and SDA(PB5) share GPIOB -> can even be set in one BSRR write.
+ * CS/DC/BL are only toggled rarely (per byte / per command), so they keep
+ * the simple macro form but still use register access for speed.           */
+#define LCD_CS_LOW()   (LCD_CS_PORT->BRR  = LCD_CS_PIN)
+#define LCD_CS_HIGH()  (LCD_CS_PORT->BSRR = LCD_CS_PIN)
+#define LCD_SCL_LOW()  (LCD_SCL_PORT->BRR  = LCD_SCL_PIN)
+#define LCD_SCL_HIGH() (LCD_SCL_PORT->BSRR = LCD_SCL_PIN)
+#define LCD_SDA_LOW()  (LCD_SDA_PORT->BRR  = LCD_SDA_PIN)
+#define LCD_SDA_HIGH() (LCD_SDA_PORT->BSRR = LCD_SDA_PIN)
+#define LCD_DC_LOW()   (LCD_DC_PORT->BRR  = LCD_DC_PIN)
+#define LCD_DC_HIGH()  (LCD_DC_PORT->BSRR = LCD_DC_PIN)
+#define LCD_BL_ON()    (LCD_BL_PORT->BSRR = LCD_BL_PIN)
+#define LCD_BL_OFF()   (LCD_BL_PORT->BRR  = LCD_BL_PIN)
 
 static void LCD_WriteByte(uint8_t dat)
 {
     uint8_t i;
 
-    for (i = 0; i < 8U; i++)
+    for (i = 0U; i < 8U; i++)
     {
-        LCD_SCL_LOW();
+        /* SPI mode 0: SCL idle low; SDA settles while SCL low, then the
+           rising edge of SCL samples it. */
+        LCD_SCL_PORT->BRR = (uint32_t)LCD_SCL_PIN;          /* SCL low  */
         if ((dat & 0x80U) != 0U)
         {
-            LCD_SDA_HIGH();
+            LCD_SDA_PORT->BSRR = (uint32_t)LCD_SDA_PIN;     /* SDA=1 */
         }
         else
         {
-            LCD_SDA_LOW();
+            LCD_SDA_PORT->BRR = (uint32_t)LCD_SDA_PIN;       /* SDA=0 */
         }
-        LCD_SoftDelay();
-        LCD_SCL_HIGH();
-        LCD_SoftDelay();
+        __NOP(); __NOP(); __NOP();    /* data setup time */
+        LCD_SCL_PORT->BSRR = (uint32_t)LCD_SCL_PIN;         /* SCL high: sample */
+        __NOP(); __NOP();             /* hold time */
         dat <<= 1U;
     }
 }
