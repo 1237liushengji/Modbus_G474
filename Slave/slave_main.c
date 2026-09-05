@@ -131,12 +131,12 @@ static void Slave_ApplyConfigChange(void);
 /* 20 columns x 17 rows layout for the 240x280 panel                   */
 static const char s_line[] = "--------------------";
 
-static void UI_DrawHome(void)
+/* static labels drawn once per page switch */
+static void UI_DrawHomeStatic(void)
 {
-    char buf[32];
-    comm_stats_t st;
     char idbuf[8];
     char bbuf[8];
+    char buf[32];
 
     U16ToStr(MB_REG_GetSlaveId(), idbuf);
     U16ToStr(MB_REG_BaudFromIdx((uint8_t)MB_REG_GetBaudIdx()), bbuf);
@@ -149,82 +149,96 @@ static void UI_DrawHome(void)
     LCD_Print(1, 3, buf, LCD_COLOR_YELLOW, LCD_COLOR_BLACK);
     LCD_Print(2, 0, s_line, LCD_COLOR_GRAY, LCD_COLOR_BLACK);
 
-    U16ToStr1(s_demo_temp, buf);   strcat(buf, " C");
     LCD_Print(3, 0, "TEMP:", LCD_COLOR_WHITE, LCD_COLOR_BLACK);
-    LCD_Print(3, 8, buf, LCD_COLOR_WHITE, LCD_COLOR_BLACK);
-
-    U16ToStr1(s_demo_humi, buf);   strcat(buf, " %");
     LCD_Print(4, 0, "HUMI:", LCD_COLOR_WHITE, LCD_COLOR_BLACK);
-    LCD_Print(4, 8, buf, LCD_COLOR_WHITE, LCD_COLOR_BLACK);
-
-    U16ToStr1(s_demo_volt, buf);   strcat(buf, " V");
     LCD_Print(5, 0, "VOLT:", LCD_COLOR_WHITE, LCD_COLOR_BLACK);
-    LCD_Print(5, 8, buf, LCD_COLOR_WHITE, LCD_COLOR_BLACK);
-
-    U16ToStr1(s_demo_curr, buf);   strcat(buf, " A");
     LCD_Print(6, 0, "CURR:", LCD_COLOR_WHITE, LCD_COLOR_BLACK);
-    LCD_Print(6, 8, buf, LCD_COLOR_WHITE, LCD_COLOR_BLACK);
 
     LCD_Print(7, 0, s_line, LCD_COLOR_GRAY, LCD_COLOR_BLACK);
 
-    /* counters: RX/TX on one line, CRC/EXC on the next */
+    LCD_Print(9, 0, "RX:", LCD_COLOR_GREEN, LCD_COLOR_BLACK);
+    LCD_Print(9, 11, "TX:", LCD_COLOR_GREEN, LCD_COLOR_BLACK);
+    LCD_Print(10, 0, "CRC:", LCD_COLOR_RED, LCD_COLOR_BLACK);
+    LCD_Print(10, 11, "EXC:", LCD_COLOR_RED, LCD_COLOR_BLACK);
+
+    LCD_Print(12, 0, "STATUS:", LCD_COLOR_WHITE, LCD_COLOR_BLACK);
+    LCD_Print(15, 0, "K0:next K1:edit", LCD_COLOR_GRAY, LCD_COLOR_BLACK);
+}
+
+/* value fields refreshed every 500 ms */
+static void UI_DrawHomeValues(void)
+{
+    char buf[16];
+    comm_stats_t st;
+    char idbuf[8];
+    char bbuf[8];
+
+    U16ToStr1(s_demo_temp, buf);   strcat(buf, " C");
+    LCD_PrintField(3, 8, buf, 9, LCD_COLOR_WHITE, LCD_COLOR_BLACK);
+
+    U16ToStr1(s_demo_humi, buf);   strcat(buf, " %");
+    LCD_PrintField(4, 8, buf, 9, LCD_COLOR_WHITE, LCD_COLOR_BLACK);
+
+    U16ToStr1(s_demo_volt, buf);   strcat(buf, " V");
+    LCD_PrintField(5, 8, buf, 9, LCD_COLOR_WHITE, LCD_COLOR_BLACK);
+
+    U16ToStr1(s_demo_curr, buf);   strcat(buf, " A");
+    LCD_PrintField(6, 8, buf, 9, LCD_COLOR_WHITE, LCD_COLOR_BLACK);
+
     U16ToStr(MB_REG_GetHolding(MB_REG_HOLD_RXCNT), idbuf);
     U16ToStr(MB_REG_GetHolding(MB_REG_HOLD_TXCNT), bbuf);
-    LCD_Print(9, 0, "RX:", LCD_COLOR_GREEN, LCD_COLOR_BLACK);
-    LCD_Print(9, 4, idbuf, LCD_COLOR_GREEN, LCD_COLOR_BLACK);
-    LCD_Print(9, 11, "TX:", LCD_COLOR_GREEN, LCD_COLOR_BLACK);
-    LCD_Print(9, 15, bbuf, LCD_COLOR_GREEN, LCD_COLOR_BLACK);
+    LCD_PrintField(9, 4, idbuf, 6, LCD_COLOR_GREEN, LCD_COLOR_BLACK);
+    LCD_PrintField(9, 15, bbuf, 5, LCD_COLOR_GREEN, LCD_COLOR_BLACK);
 
     MB_Slave_GetStats(&st);
     U16ToStr(st.crc_error_count, idbuf);
     U16ToStr(st.exception_count, bbuf);
-    LCD_Print(10, 0, "CRC:", LCD_COLOR_RED, LCD_COLOR_BLACK);
-    LCD_Print(10, 5, idbuf, LCD_COLOR_RED, LCD_COLOR_BLACK);
-    LCD_Print(10, 11, "EXC:", LCD_COLOR_RED, LCD_COLOR_BLACK);
-    LCD_Print(10, 16, bbuf, LCD_COLOR_RED, LCD_COLOR_BLACK);
+    LCD_PrintField(10, 5, idbuf, 5, LCD_COLOR_RED, LCD_COLOR_BLACK);
+    LCD_PrintField(10, 16, bbuf, 4, LCD_COLOR_RED, LCD_COLOR_BLACK);
 
-    /* status line */
-    LCD_Print(12, 0, "STATUS:", LCD_COLOR_WHITE, LCD_COLOR_BLACK);
     if (MB_REG_GetHolding(MB_REG_HOLD_STATUS) == 1U)
     {
-        LCD_Print(12, 9, "OK", LCD_COLOR_GREEN, LCD_COLOR_BLACK);
+        LCD_PrintField(12, 9, "OK", 4, LCD_COLOR_GREEN, LCD_COLOR_BLACK);
     }
     else
     {
-        LCD_Print(12, 9, "WARN", LCD_COLOR_YELLOW, LCD_COLOR_BLACK);
+        LCD_PrintField(12, 9, "WARN", 4, LCD_COLOR_YELLOW, LCD_COLOR_BLACK);
     }
-    LCD_Print(15, 0, "K0:next K1:edit", LCD_COLOR_GRAY, LCD_COLOR_BLACK);
 }
 
 /*====================================================================*/
 /* Error page                                                          */
 /*====================================================================*/
-static void UI_DrawError(void)
+static void UI_DrawErrorStatic(void)
+{
+    LCD_Print(0, 5, "ERROR PAGE", LCD_COLOR_RED, LCD_COLOR_BLACK);
+    LCD_Print(1, 0, s_line, LCD_COLOR_GRAY, LCD_COLOR_BLACK);
+
+    LCD_Print(2, 0, "CRC ERROR :", LCD_COLOR_WHITE, LCD_COLOR_BLACK);
+    LCD_Print(3, 0, "EXCEPTION :", LCD_COLOR_WHITE, LCD_COLOR_BLACK);
+    LCD_Print(4, 0, "RX TOTAL  :", LCD_COLOR_WHITE, LCD_COLOR_BLACK);
+    LCD_Print(5, 0, "LAST ERR  :", LCD_COLOR_WHITE, LCD_COLOR_BLACK);
+
+    LCD_Print(8, 0, "K0:next page", LCD_COLOR_GRAY, LCD_COLOR_BLACK);
+}
+
+static void UI_DrawErrorValues(void)
 {
     char buf[16];
     comm_stats_t st;
 
     MB_Slave_GetStats(&st);
-    LCD_Print(0, 5, "ERROR PAGE", LCD_COLOR_RED, LCD_COLOR_BLACK);
-    LCD_Print(1, 0, s_line, LCD_COLOR_GRAY, LCD_COLOR_BLACK);
-
     U16ToStr(st.crc_error_count, buf);
-    LCD_Print(2, 0, "CRC ERROR :", LCD_COLOR_WHITE, LCD_COLOR_BLACK);
-    LCD_Print(2, 12, buf, LCD_COLOR_RED, LCD_COLOR_BLACK);
+    LCD_PrintField(2, 12, buf, 6, LCD_COLOR_RED, LCD_COLOR_BLACK);
 
     U16ToStr(st.exception_count, buf);
-    LCD_Print(3, 0, "EXCEPTION :", LCD_COLOR_WHITE, LCD_COLOR_BLACK);
-    LCD_Print(3, 12, buf, LCD_COLOR_RED, LCD_COLOR_BLACK);
+    LCD_PrintField(3, 12, buf, 6, LCD_COLOR_RED, LCD_COLOR_BLACK);
 
     U16ToStr(MB_REG_GetHolding(MB_REG_HOLD_RXCNT), buf);
-    LCD_Print(4, 0, "RX TOTAL  :", LCD_COLOR_WHITE, LCD_COLOR_BLACK);
-    LCD_Print(4, 12, buf, LCD_COLOR_WHITE, LCD_COLOR_BLACK);
+    LCD_PrintField(4, 12, buf, 6, LCD_COLOR_WHITE, LCD_COLOR_BLACK);
 
     U16ToStr(MB_REG_GetHolding(MB_REG_HOLD_ERRCODE), buf);
-    LCD_Print(5, 0, "LAST ERR  :", LCD_COLOR_WHITE, LCD_COLOR_BLACK);
-    LCD_Print(5, 12, buf, LCD_COLOR_YELLOW, LCD_COLOR_BLACK);
-
-    LCD_Print(8, 0, "K0:next page", LCD_COLOR_GRAY, LCD_COLOR_BLACK);
+    LCD_PrintField(5, 12, buf, 6, LCD_COLOR_YELLOW, LCD_COLOR_BLACK);
 }
 
 /*====================================================================*/
@@ -258,26 +272,18 @@ static uint16_t CfgStep(uint16_t addr, uint16_t cur)
     }
 }
 
+/* static frame for the config page (labels + border + hint) */
 static void UI_DrawConfig(void)
 {
-    char buf[16];
     uint8_t i;
-    uint16_t val;
 
     LCD_Print(0, 5, "CONFIG PAGE", LCD_COLOR_CYAN, LCD_COLOR_BLACK);
     LCD_Print(1, 0, s_line, LCD_COLOR_GRAY, LCD_COLOR_BLACK);
-
     for (i = 0; i < CFG_ITEM_COUNT; i++)
     {
-        uint16_t fg = (s_editing && (i == s_cfg_cursor)) ? LCD_COLOR_BLACK : LCD_COLOR_WHITE;
-        uint16_t bg = (s_editing && (i == s_cfg_cursor)) ? LCD_COLOR_YELLOW : LCD_COLOR_BLACK;
-
-        val = MB_REG_GetHolding(s_cfg_items[i].addr);
-        LCD_Print((uint8_t)(2 + i), 0, s_cfg_items[i].name, fg, bg);
-        U16ToStr(val, buf);
-        LCD_Print((uint8_t)(2 + i), 13, buf, fg, bg);
+        LCD_Print((uint8_t)(2 + i), 0, s_cfg_items[i].name,
+                  LCD_COLOR_WHITE, LCD_COLOR_BLACK);
     }
-
     if (s_editing)
     {
         LCD_Print(8, 0, "K1:value WKUP:save", LCD_COLOR_YELLOW, LCD_COLOR_BLACK);
@@ -286,6 +292,34 @@ static void UI_DrawConfig(void)
     {
         LCD_Print(8, 0, "K1:edit WKUP:--", LCD_COLOR_GRAY, LCD_COLOR_BLACK);
     }
+}
+
+/* dynamic values + highlighted row on the config page */
+static void UI_DrawConfigValues(void)
+{
+    char buf[16];
+    uint8_t i;
+
+    for (i = 0; i < CFG_ITEM_COUNT; i++)
+    {
+        uint16_t fg = (s_editing && (i == s_cfg_cursor)) ? LCD_COLOR_BLACK : LCD_COLOR_WHITE;
+        uint16_t bg = (s_editing && (i == s_cfg_cursor)) ? LCD_COLOR_YELLOW : LCD_COLOR_BLACK;
+        uint16_t val = MB_REG_GetHolding(s_cfg_items[i].addr);
+
+        /* re-draw the highlighted row's label too (inverted colors) */
+        if (s_editing && (i == s_cfg_cursor))
+        {
+            LCD_Print((uint8_t)(2 + i), 0, s_cfg_items[i].name, fg, bg);
+        }
+        U16ToStr(val, buf);
+        LCD_PrintField((uint8_t)(2 + i), 13, buf, 6, fg, bg);
+    }
+}
+
+static void UI_DrawConfigFrame(void)
+{
+    UI_DrawConfig();
+    UI_DrawConfigValues();
 }
 
 /*====================================================================*/
@@ -336,20 +370,64 @@ static void UI_HandleKey(key_event_t ev, key_id_t key)
     }
 }
 
+/* draw the static (label) layer of the current page - called once */
+static void UI_DrawStatic(void)
+{
+    switch (s_page)
+    {
+        case UI_PAGE_HOME:    UI_DrawHomeStatic();  break;
+        case UI_PAGE_ERROR:   UI_DrawErrorStatic(); break;
+        case UI_PAGE_CONFIG:  UI_DrawConfig();      break;
+        default:              break;
+    }
+}
+
+/* refresh only the dynamic value rows (cheap, non-blocking) */
+static void UI_DrawValues(void)
+{
+    switch (s_page)
+    {
+        case UI_PAGE_HOME:    UI_DrawHomeValues();   break;
+        case UI_PAGE_ERROR:   UI_DrawErrorValues();  break;
+        case UI_PAGE_CONFIG:  UI_DrawConfigValues(); break;
+        default:              break;
+    }
+}
+
+/* full redraw of the config page (static frame + values) used on edits */
+static void UI_DrawConfigFull(void)
+{
+    UI_DrawConfig();
+    UI_DrawConfigValues();
+}
+
 static void UI_Update(void)
 {
     uint32_t now = HAL_GetTick();
 
-    if (s_ui_redraw || ((now - s_ui_last_ms) >= 500U))
+    if (s_ui_redraw)
+    {
+        s_ui_redraw = 0U;
+        s_ui_last_ms = now;
+        if (s_page == UI_PAGE_CONFIG)
+        {
+            UI_DrawConfigFull();   /* labels + values, single shot */
+        }
+        else
+        {
+            UI_DrawStatic();
+            UI_DrawValues();
+        }
+    }
+    else if ((now - s_ui_last_ms) >= 500U)
     {
         s_ui_last_ms = now;
-        s_ui_redraw = 0U;
         switch (s_page)
         {
-            case UI_PAGE_HOME:    UI_DrawHome();    break;
-            case UI_PAGE_ERROR:   UI_DrawError();   break;
-            case UI_PAGE_CONFIG:  UI_DrawConfig();  break;
-            default:              break;
+            case UI_PAGE_HOME:   UI_DrawHomeValues();  break;
+            case UI_PAGE_ERROR:  UI_DrawErrorValues(); break;
+            /* CONFIG page changes are event-driven (keys) -> redraw only */
+            default: break;
         }
     }
 }

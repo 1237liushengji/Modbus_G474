@@ -31,8 +31,9 @@ const uint16_t LCD_WIDTH  = 240;      /* portrait: 240 px wide            */
 const uint16_t LCD_HEIGHT = 280;      /* visible 280 px of the 320 GRAM   */
 #define LCD_X_OFFSET   0U             /* controller X origin offset       */
 #define LCD_Y_OFFSET   20U            /* panel starts 20 px into GRAM     */
-#define LCD_MADCTL_VAL 0xC0U          /* portrait flipped (MY|MX), RGB     */
-                                      /* = vendor Direction_V_Flip         */
+#define LCD_MADCTL_VAL 0x80U          /* MY only: flip vertical (fixes the
+                                         upside-down seen with 0x00 while
+                                         keeping left/right order)        */
 #elif (LCD_CTRL_SELECT == 1)
 const uint16_t LCD_WIDTH  = 240;
 const uint16_t LCD_HEIGHT = 320;
@@ -462,4 +463,29 @@ void LCD_Print(uint8_t row, uint8_t col, const char *text,
         col++;
         text++;
     }
+}
+
+void LCD_PrintField(uint8_t row, uint8_t col, const char *text,
+                    uint8_t width, uint16_t fg, uint16_t bg)
+{
+    char buf[40];
+    uint8_t i;
+    uint8_t len;
+
+    if (width > (uint8_t)sizeof(buf))
+    {
+        width = (uint8_t)sizeof(buf);
+    }
+    /* measure text length (bounded) */
+    len = 0U;
+    while ((text[len] != '\0') && (len < width))
+    {
+        len++;
+    }
+    for (i = 0U; i < width; i++)
+    {
+        buf[i] = (i < len) ? text[i] : ' ';
+    }
+    buf[width] = '\0';
+    LCD_Print(row, col, buf, fg, bg);
 }

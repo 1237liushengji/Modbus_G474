@@ -47,6 +47,17 @@ void LCD_Print(uint8_t row, uint8_t col, const char *text,
 /** Fill one whole char row with a color (fast row erase). */
 void LCD_ClearRow(uint8_t row, uint16_t color);
 
+/**
+  * @brief  Print a fixed-width field: text is padded with spaces to the
+  *         given width so an updated shorter value cleanly overwrites a
+  *         longer previous one (no ghosting).
+  * @param  row, col  char-cell origin
+  * @param  text      string (truncated if longer than width)
+  * @param  width     field width in char cells (<= remaining cols)
+  */
+void LCD_PrintField(uint8_t row, uint8_t col, const char *text,
+                    uint8_t width, uint16_t fg, uint16_t bg);
+
 /** Screen geometry (depends on controller). */
 extern const uint16_t LCD_WIDTH;
 extern const uint16_t LCD_HEIGHT;
