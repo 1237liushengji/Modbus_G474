@@ -17,7 +17,10 @@
 void BSP_Tick_Init(void);
 
 /**
-  * @brief  Current time in microseconds since init (wraps ~ every 4295 s).
+  * @brief  Current time in microseconds since init.
+  * @note   Backed by the 32-bit DWT cycle counter; do NOT measure any
+  *         single interval longer than ~20 s (the counter wraps every
+  *         ~28.6 s at 150 MHz). Fine for Modbus t3.5/timeouts.
   */
 uint32_t BSP_Tick_GetUs(void);
 

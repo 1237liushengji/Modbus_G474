@@ -4,8 +4,8 @@
   * @brief   Register-level USART3 driver for RS485 link.
   *
   *  RX architecture selected by RS485_RX_MODE (bsp_board_cfg.h):
-  *    0 - RXNE interrupt per byte (V1.0 baseline, byte callback)
-  *    1 - DMA circular + IDLE frame detection (V1.4, default):
+  *    0 - RXNE interrupt per byte (default, verified on hardware)
+  *    1 - DMA circular + IDLE frame detection (V1.4, optional):
   *        UART --DMA--> s_dma_buf --(IDLE ISR)--> s_ring --(service)--> frame
   *
   *  DMA mode details:

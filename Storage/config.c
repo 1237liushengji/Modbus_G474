@@ -14,7 +14,9 @@
 /*====================================================================*/
 static uint8_t s_loaded = 0U;
 
-/* on-media layout: 16 bytes payload + 2 bytes CRC */
+/* on-media layout (17 bytes): 15 bytes payload + 2 bytes CRC
+   magic[2] ver[1] slave_id[1] baud_idx[1] temp_limit[2] volt_limit[2]
+   sample_period[2] dev_mode[1] reserved[3] crc[2]                       */
 typedef struct {
     uint8_t  magic[2];      /* 'M','B' */
     uint8_t  version;
@@ -28,7 +30,7 @@ typedef struct {
     uint8_t  crc[2];
 } config_record_t;
 
-#define CONFIG_RECORD_SIZE   ((uint16_t)sizeof(config_record_t))   /* 18 */
+#define CONFIG_RECORD_SIZE   ((uint16_t)sizeof(config_record_t))   /* 17 */
 
 static void DefaultParams(config_param_t *p)
 {

@@ -3,10 +3,9 @@
   * @file    config.h
   * @brief   Parameter persistence layer on 24C02 (Storage layer).
   *
-  *  Layout (docs/08-Storage设计.md):
-  *   | magic(2) | ver(1) | slave_id(1) | baud_idx(2) | temp_limit(2) |
-  *   | volt_limit(2) | sample_period(2) | dev_mode(2) | crc16(2) |
-  *   = 18 bytes, fits in 24C02 page-safe chunks.
+  *  config_param_t is the in-RAM working copy (this header).
+  *  On-media layout is the packed 17-byte record defined in config.c
+  *  (see its comment; offsets derive from sizeof, never hard-code).
   ******************************************************************************
   */
 #ifndef __CONFIG_H
@@ -21,7 +20,7 @@
 
 typedef struct {
     uint8_t  slave_id;          /* 1..247 */
-    uint8_t  baud_idx;          /* 0..5 (see baud table) */
+    uint8_t  baud_idx;          /* 0..4 (9600..115200) */
     uint16_t temp_limit;        /* 0.1 C   */
     uint16_t volt_limit;        /* 0.01 V  */
     uint16_t sample_period;     /* ms      */

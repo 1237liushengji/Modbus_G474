@@ -38,10 +38,10 @@
 #define RS485_UART_CLK_ENABLE()  __HAL_RCC_USART3_CLK_ENABLE()
 
 /* RX path selection:
- *   0 = RXNE interrupt per byte  (V1.0 baseline, byte callback)
- *   1 = DMA circular + IDLE line (V1.4, default, frame callback)      */
+ *   0 = RXNE interrupt per byte (default; verified on hardware)
+ *   1 = DMA circular + IDLE line (V1.4 option, enable by setting 1)     */
 #ifndef RS485_RX_MODE
-#define RS485_RX_MODE            1
+#define RS485_RX_MODE            0
 #endif
 
 #define RS485_TX_GPIO_PORT       GPIOB

@@ -343,7 +343,8 @@ void LCD_ClearRow(uint8_t row, uint16_t color)
 }
 
 /*====================================================================*/
-/* 5x7 ASCII font (columns; bit7..bit1 = rows 0..6, bit0 unused)        */
+/* 5x7 ASCII font, column-major: each byte = one column, bit0 = TOP row
+   (bit6 = bottom row, bit7 unused). LCD_DrawChar tests (1U << gr).     */
 /*====================================================================*/
 static const uint8_t s_font5x7[96][5] = {
     {0x00,0x00,0x00,0x00,0x00},{0x00,0x00,0x5F,0x00,0x00},

@@ -2,6 +2,7 @@
 /MDK-ARM/G474/
 /MDK-ARM/Listings/
 /MDK-ARM/Objects/
+/MDK-ARM/RTE/
 *.o
 *.d
 *.axf
@@ -32,6 +33,7 @@ __pycache__/
 *.pyc
 .venv/
 venv/
+/Tools/python/results/
 
 # ===== Misc =====
 Thumbs.db

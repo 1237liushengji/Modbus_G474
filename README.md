@@ -36,19 +36,20 @@ Modbus-RTU/
 ├── BSP/                   bsp_uart/rs485/tick/eeprom/w25q128/lcd/key + bsp_board_cfg(唯一配置点)
 ├── Storage/               config（24C02 参数）/ log（W25Q128 环形日志）
 ├── Common/                ring_buffer / types / 平台无关公共代码
+├── App/                   应用层（预留；角色逻辑在 Master/ 与 Slave/）
 ├── Master/                master_main（A 板角色入口）
 ├── Slave/                 slave_main（B 板角色入口，LCD 三页 UI）
 ├── Tools/
 │   ├── python/            PC 测试工具 + 离线自测 + 压力测试
 │   └── verification/      CRC 交叉验证 + Modbus 黄金测试向量
-├── docs/                  设计文档（01~09）
+├── docs/                  设计文档（01~10）
 ├── MDK-ARM/               Keil 工程（G474.uvprojx）
 └── README.md
 ```
 
 > 说明：CubeMX 例程未含 `.ioc`，全部外设初始化采用「BSP 自初始化」模式
-> （参照 `Drivers/User/led.c`），不依赖 CubeMX 重新生成，且可合入你自己的 CubeMX 工程
-> （见 `docs/09-CubeMX合入指南.md`）。
+> （参照 `Drivers/User/Src/led.c` 与 `Drivers/User/Inc/led.h`），不依赖 CubeMX
+> 重新生成，且可合入你自己的 CubeMX 工程（见 `docs/09-CubeMX合入指南.md`）。
 > 源码一律 UTF-8、注释以英文为主；设计文档用中文写在 `docs/`。
 
 ## 双板角色编译
@@ -64,9 +65,9 @@ Modbus-RTU/
 
 | 宏 | 默认 | 说明 |
 |----|------|------|
-| `RS485_RX_MODE` | 1 | 0=中断逐字节，1=DMA+IDLE+RingBuffer |
+| `RS485_RX_MODE` | 0 | 0=中断逐字节（默认，真机验证），1=DMA+IDLE+RingBuffer |
 | `RS485_USE_DE_PIN` | 0 | 自动收发=0；DE GPIO 控制=1（填引脚） |
-| `LCD_CTRL_SELECT` | 0 | 0=ST7789 1=ILI9341 2=ST7735 |
+| `LCD_CTRL_SELECT` | 0 | 0=ST7789(240x280) 1=ILI9341 2=ST7735 |
 
 ## 版本路线（Git tag：v0.1 … v2.0）
 
