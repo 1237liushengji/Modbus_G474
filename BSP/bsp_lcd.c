@@ -31,7 +31,7 @@ const uint16_t LCD_WIDTH  = 240;      /* portrait: 240 px wide            */
 const uint16_t LCD_HEIGHT = 280;      /* visible 280 px of the 320 GRAM   */
 #define LCD_X_OFFSET   0U             /* controller X origin offset       */
 #define LCD_Y_OFFSET   20U            /* panel starts 20 px into GRAM     */
-#define LCD_MADCTL_VAL 0x80U          /* MY only: flip vertical (fixes the
+#define LCD_MADCTL_VAL 0x00U          /* MY only: flip vertical (fixes the
                                          upside-down seen with 0x00 while
                                          keeping left/right order)        */
 #elif (LCD_CTRL_SELECT == 1)
@@ -428,7 +428,7 @@ static void LCD_DrawChar(uint16_t x, uint16_t y, char ch,
             uint16_t in_glyph_col = (cx < (5U * LCD_FONT_SCALE)) ? 1U : 0U;
 
             if (in_glyph_row && in_glyph_col &&
-                ((glyph[gc] & (0x40U >> gr)) != 0U))
+                ((glyph[gc] & (0x01U << gr)) != 0U))
             {
                 px = fg;
             }
