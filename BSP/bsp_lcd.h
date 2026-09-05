@@ -3,7 +3,7 @@
   * @file    bsp_lcd.h
   * @brief   SPI TFT LCD driver (soft SPI) - ST7789 240x280 (1.69") primary.
   *
-  *  Board wiring (Genbotter G474, matches vendor example E:\...\2.参考例程\6.LCD):
+  *  Board wiring (Genbotter G474, matches the vendor LCD example):
   *    LCD_CS  PD11   LCD_SCL PB3   LCD_SDA PB5   LCD_DC PD12   LCD_BL PD13
   *
   *  Controller selected by LCD_CTRL_SELECT in bsp_board_cfg.h:
