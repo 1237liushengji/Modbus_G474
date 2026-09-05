@@ -286,11 +286,12 @@ static void UI_DrawConfig(void)
     }
     if (s_editing)
     {
-        LCD_Print(8, 0, "K1:value WKUP:save", LCD_COLOR_YELLOW, LCD_COLOR_BLACK);
+        LCD_Print(8, 0, "K0:item K1:value", LCD_COLOR_YELLOW, LCD_COLOR_BLACK);
+        LCD_Print(9, 0, "WKUP:save", LCD_COLOR_YELLOW, LCD_COLOR_BLACK);
     }
     else
     {
-        LCD_Print(8, 0, "K1:edit WKUP:--", LCD_COLOR_GRAY, LCD_COLOR_BLACK);
+        LCD_Print(8, 0, "K0:next K1:edit", LCD_COLOR_GRAY, LCD_COLOR_BLACK);
     }
 }
 
@@ -327,14 +328,30 @@ static void UI_DrawConfigFrame(void)
 /*====================================================================*/
 static void UI_HandleKey(key_event_t ev, key_id_t key)
 {
+    (void)ev;
     switch (key)
     {
         case KEY_K0:
-            if (!s_editing)
+            if (s_page == UI_PAGE_CONFIG)
             {
-                s_page = (ui_page_t)((s_page + 1U) % UI_PAGE_COUNT);
-                s_ui_redraw = 1U;
+                if (s_editing)
+                {
+                    /* in edit mode K0 moves the highlight to the next
+                       editable item (TempLimit->VoltLimit->...->BaudIdx) */
+                    s_cfg_cursor = (uint8_t)((s_cfg_cursor + 1U) % CFG_ITEM_COUNT);
+                }
+                else
+                {
+                    /* not editing: K0 leaves the config page as usual */
+                    s_page = (ui_page_t)((s_page + 1U) % UI_PAGE_COUNT);
+                }
             }
+            else
+            {
+                /* on other pages K0 cycles pages */
+                s_page = (ui_page_t)((s_page + 1U) % UI_PAGE_COUNT);
+            }
+            s_ui_redraw = 1U;
             break;
 
         case KEY_K1:
@@ -347,7 +364,7 @@ static void UI_HandleKey(key_event_t ev, key_id_t key)
                 }
                 else
                 {
-                    /* adjust selected item */
+                    /* adjust the currently highlighted item */
                     uint16_t addr = s_cfg_items[s_cfg_cursor].addr;
                     uint16_t cur = MB_REG_GetHolding(addr);
                     MB_REG_SetHolding(addr, CfgStep(addr, cur));
