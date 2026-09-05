@@ -98,6 +98,35 @@ uint8_t MB_REG_HoldingWritable(uint16_t addr)
     return (addr >= MB_REG_HOLD_CFG_FIRST) && (addr <= MB_REG_HOLD_MAX_ADDR);
 }
 
+uint8_t MB_REG_ValidateConfigValue(uint16_t addr, uint16_t value)
+{
+    switch (addr)
+    {
+        case MB_REG_HOLD_TEMP_LIMIT:
+        case MB_REG_HOLD_VOLT_LIMIT:
+            return (value != 0U) ? 1U : 0U;
+
+        case MB_REG_HOLD_SAMPLE_PERIOD:
+            /* 10 ms .. 60000 ms */
+            return ((value >= 10U) && (value <= 60000U)) ? 1U : 0U;
+
+        case MB_REG_HOLD_DEV_MODE:
+            return (value <= 3U) ? 1U : 0U;
+
+        case MB_REG_HOLD_SLAVE_ID:
+            /* 1..247 (0 = broadcast, 248+ reserved) */
+            return ((value >= 1U) && (value <= 247U)) ? 1U : 0U;
+
+        case MB_REG_HOLD_BAUD_IDX:
+            /* 0..4 = 9600..115200 (230400 removed: transceiver limit) */
+            return (value <= 4U) ? 1U : 0U;
+
+        default:
+            /* config region only; non-config handled by caller */
+            return 0U;
+    }
+}
+
 /*====================================================================*/
 /* Input registers                                                     */
 /*====================================================================*/
@@ -181,7 +210,7 @@ uint16_t MB_REG_GetBaudIdx(void)
 uint32_t MB_REG_BaudFromIdx(uint8_t idx)
 {
     static const uint32_t baud_table[] = {
-        9600U, 19200U, 38400U, 57600U, 115200U, 230400U
+        9600U, 19200U, 38400U, 57600U, 115200U
     };
     if (idx > MB_BAUD_IDX_MAX)
     {

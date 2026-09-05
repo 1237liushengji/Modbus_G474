@@ -30,7 +30,8 @@ typedef enum {
 /*====================================================================*/
 static uint8_t  s_slave_id = 1U;
 static uint32_t s_t35_us = 4000U;
-static uint32_t s_timeout_us = 100000U;   /* 100 ms per attempt */
+static uint32_t s_timeout_us = 100000U;   /* 100 ms per attempt @115200 */
+static uint32_t s_baudrate = 115200U;
 static uint8_t  s_retry_max = 2U;         /* total tries = retry_max+1 */
 
 static mb_master_tx_func_t s_tx_func = 0;
@@ -46,6 +47,7 @@ static uint16_t s_req_len = 0U;
 static uint8_t  s_rx_buf[MB_RTU_MAX_FRAME_LEN];
 static volatile uint16_t s_rx_len = 0U;
 static volatile uint32_t s_last_byte_us = 0U;
+static uint32_t s_first_byte_us = 0U;   /* set on first response byte */
 
 static comm_stats_t s_stats;
 static mb_master_result_t s_result;
@@ -57,13 +59,38 @@ static uint16_t s_consec_fails = 0U;
 void MB_Master_Init(uint8_t slave_id, uint32_t baudrate,
                     uint32_t timeout_ms, uint8_t retry_max)
 {
+    uint32_t scale;
+
     s_slave_id = slave_id;
+    s_baudrate = baudrate;
     s_t35_us = MB_T35_US(baudrate);
-    s_timeout_us = timeout_ms * 1000U;
+
+    /* Timeout is specified for 115200. Scale it by baud ratio so that a
+       large response (e.g. 125 regs = 253 bytes) at 9600 baud (~292 ms on
+       the wire) is not misjudged as a timeout. */
+    if (baudrate == 0U)
+    {
+        scale = 12U;      /* worst case: assume 9600 */
+    }
+    else
+    {
+        scale = 115200U / baudrate;
+        if (scale < 1U)
+        {
+            scale = 1U;
+        }
+        if (scale > 20U)
+        {
+            scale = 20U;  /* clamp: never exceed ~2 s */
+        }
+    }
+    s_timeout_us = timeout_ms * 1000U * scale;
+
     s_retry_max = retry_max;
     s_state = MASTER_IDLE;
     s_rx_len = 0U;
     s_tx_func = 0;
+    s_first_byte_us = 0U;
 }
 
 void MB_Master_SetTxFunc(mb_master_tx_func_t f)
@@ -91,6 +118,11 @@ void MB_Master_OnRxByte(uint8_t byte, uint32_t now_us)
         if (s_rx_len >= (uint16_t)sizeof(s_rx_buf))
         {
             s_rx_len = 0U;      /* overflow -> restart capture */
+            s_first_byte_us = now_us;
+        }
+        else if (s_rx_len == 0U)
+        {
+            s_first_byte_us = now_us;   /* first byte of the response */
         }
         s_rx_buf[s_rx_len] = byte;
         s_rx_len++;
@@ -250,6 +282,7 @@ static void Master_Send(void)
     }
     s_stats.tx_count++;
     s_rx_len = 0U;
+    s_first_byte_us = 0U;
     s_state = MASTER_WAIT;
     s_sent_us = 0U;     /* set by caller Poll with current time */
 }
@@ -415,13 +448,28 @@ uint8_t MB_Master_Poll(uint32_t now_us)
                 /* else: invalid -> keep waiting for timeout/retry */
             }
 
-            /* timeout check */
-            if (s_state == MASTER_WAIT &&
-                ((uint32_t)(now_us - s_sent_us) >= s_timeout_us))
+            /* timeout check: measured from send, or from the first response
+               byte once a response has started arriving (so a slow big
+               response at low baud is not cut off mid-frame) */
+            if (s_state == MASTER_WAIT)
             {
-                if (Master_TimeoutAction())
+                uint32_t elapsed;
+                if (s_rx_len > 0U)
                 {
-                    finished = 1U;
+                    /* response in flight: allow full max frame duration */
+                    elapsed = (uint32_t)(now_us - s_first_byte_us);
+                    elapsed += MB_T35_US(s_baudrate);
+                }
+                else
+                {
+                    elapsed = (uint32_t)(now_us - s_sent_us);
+                }
+                if (elapsed >= s_timeout_us)
+                {
+                    if (Master_TimeoutAction())
+                    {
+                        finished = 1U;
+                    }
                 }
             }
             break;

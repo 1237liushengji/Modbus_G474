@@ -198,19 +198,35 @@ static void DMA_RingPull(void)
 {
     uint16_t ndtr = (uint16_t)s_hdma.Instance->CNDTR;
     uint16_t cur = (uint16_t)(RX_DMA_BUF_SIZE - ndtr);  /* DMA write pos */
-    uint16_t produced = (uint16_t)(cur - s_dma_last_pos);
+    uint16_t produced;
     uint16_t i;
+
+    /* Wrap-safe byte count: DMA circular pointer may have wrapped around
+       the end of s_dma_buf since the last pull. */
+    if (cur >= s_dma_last_pos)
+    {
+        produced = (uint16_t)(cur - s_dma_last_pos);
+    }
+    else
+    {
+        produced = (uint16_t)(cur + RX_DMA_BUF_SIZE - s_dma_last_pos);
+    }
 
     if (produced == 0U)
     {
         return;
+    }
+    /* Defensive: a frame can never exceed the ring, but guard anyway. */
+    if (produced > RX_RING_SIZE)
+    {
+        produced = RX_RING_SIZE;
     }
     for (i = 0U; i < produced; i++)
     {
         uint16_t idx = (uint16_t)((s_dma_last_pos + i) % RX_DMA_BUF_SIZE);
         if (RING_Push(&s_ring, s_dma_buf[idx]) == 0U)
         {
-            break;   /* ring full: drop overflow (cannot happen at 115k) */
+            break;   /* ring full: drop overflow (should not happen) */
         }
     }
     s_dma_last_pos = (uint16_t)((s_dma_last_pos + produced) % RX_DMA_BUF_SIZE);
@@ -226,7 +242,8 @@ void BSP_UART_RxDmaService(void)
     if (!RING_Empty(&s_ring) &&
         ((uint32_t)(now_us - s_last_byte_us) >= s_t35_us))
     {
-        /* idle long enough: one complete frame is buffered */
+        /* idle long enough: the ring holds exactly ONE complete frame
+           (the IDLE interrupt fired once per received frame); pop it all */
         uint8_t frame[RX_MAX_FRAME_LEN];
         uint16_t len = 0U;
         uint8_t b;

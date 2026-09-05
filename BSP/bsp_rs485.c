@@ -17,9 +17,17 @@
 static rs485_rx_cb_t s_rx_cb = 0;
 static rs485_rx_frame_cb_t s_rx_frame_cb = 0;
 static volatile uint32_t s_rx_count = 0;
+static volatile uint8_t  s_tx_active = 0U;   /* suppress RX while TX on */
 
 static void RxByteBridge(uint8_t byte)
 {
+    /* Half-duplex: bytes received while we are transmitting are our own
+       echo (auto-direction transceivers may keep RO enabled while DE is
+       driven). Drop them so the protocol layer never sees a self frame. */
+    if (s_tx_active != 0U)
+    {
+        return;
+    }
     s_rx_count++;
     if (s_rx_cb != 0)
     {
@@ -30,6 +38,10 @@ static void RxByteBridge(uint8_t byte)
 #if (RS485_RX_MODE == 1)
 static void RxFrameBridge(const uint8_t *frame, uint16_t len, uint32_t now_us)
 {
+    if (s_tx_active != 0U)
+    {
+        return;
+    }
     s_rx_count += len;
     if (s_rx_frame_cb != 0)
     {
@@ -84,6 +96,7 @@ void RS485_SetRxMode(void)
 
 void RS485_SendFrame(const uint8_t *data, uint16_t len)
 {
+    s_tx_active = 1U;   /* start suppressing any RX echo */
     RS485_SetTxMode();
     BSP_UART_SendBytes(data, len);
     /* Critical: wait until the LAST byte (incl. stop bit) is fully shifted
@@ -91,6 +104,7 @@ void RS485_SendFrame(const uint8_t *data, uint16_t len)
        tail would be cut off. */
     BSP_UART_WaitTxComplete();
     RS485_SetRxMode();
+    s_tx_active = 0U;   /* bus quiet again, resume listening */
 }
 
 void RS485_SetRxCallback(rs485_rx_cb_t cb)

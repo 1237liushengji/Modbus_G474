@@ -32,6 +32,61 @@
 
 static I2C_HandleTypeDef s_hi2c;
 
+/**
+  * @brief  Compute I2C_TIMINGR for standard mode (100 kHz, conservative
+  *         ~90 kHz effective) from the actual PCLK1.
+  *
+  *  G4 TIMINGR layout (see stm32g474xx.h):
+  *     PRESC[31:28] SCLDEL[23:20] SDADEL[19:16] SCLH[15:8] SCLL[7:0]
+  *  SCLDEL/SDADEL are 4-bit, SCLH/SCLL are 8-bit.
+  *
+  *  Reference model (RM0440 I2C timing):
+  *     tI2CCLK = (PRESC+1) / fPCLK1
+  *     tSCLL   = (SCLL+1)  * tI2CCLK ; tSCLH = (SCLH+1) * tI2CCLK
+  *  We pick PRESC so the I2C kernel clock is ~5 MHz, then set
+  *  SCLH/SCLL for ~90 kHz (a safe margin below the 100 kHz limit).
+  */
+static uint32_t I2C_ComputeTiming(uint32_t pclk_hz)
+{
+    uint32_t presc;
+    uint32_t scll, sclh;
+    uint32_t sdad, scld;
+    uint64_t t_iclk;   /* I2C kernel period, in ps for precision */
+
+    if (pclk_hz == 0U)
+    {
+        pclk_hz = 150000000U;   /* fallback */
+    }
+
+    /* PRESC: kernel clock ~5 MHz  -> tI2CCLK = 200 ns @150MHz */
+    presc = (pclk_hz / 5000000U) - 1U;
+    if (presc > 0x0FU)
+    {
+        presc = 0x0FU;
+    }
+    t_iclk = 1000000000000ULL / pclk_hz * (uint64_t)(presc + 1U);
+
+    /* SCL ~90 kHz -> half period ~5.56 us */
+    scll = (uint32_t)((5560000ULL / t_iclk) - 1U);
+    sclh = scll;
+    if (scll > 0xFFU)
+    {
+        scll = 0xFFU;
+        sclh = 0xFFU;
+    }
+    /* SDADEL ~ 0.6 us, SCLDEL ~ 1.2 us (both 4-bit fields) */
+    sdad = (uint32_t)(600000ULL / t_iclk);
+    scld = (uint32_t)(1200000ULL / t_iclk);
+    if (sdad > 0x0FU) sdad = 0x0FU;
+    if (scld > 0x0FU) scld = 0x0FU;
+
+    return (presc << I2C_TIMINGR_PRESC_Pos) |
+           (scld << I2C_TIMINGR_SCLDEL_Pos) |
+           (sdad << I2C_TIMINGR_SDADEL_Pos) |
+           (sclh << I2C_TIMINGR_SCLH_Pos) |
+           (scll << I2C_TIMINGR_SCLL_Pos);
+}
+
 int32_t EEPROM_Init(void)
 {
     GPIO_InitTypeDef gpio = {0};
@@ -51,14 +106,7 @@ int32_t EEPROM_Init(void)
     HAL_GPIO_Init(EEPROM_SDA_PORT, &gpio);
 
     s_hi2c.Instance             = EEPROM_I2C;
-    /* 100 kHz standard mode timing for PCLK1 = 170 MHz (tI2CCLK = 58.8 ns,
-       PRESC=9). Conservative margins -> actual SCL ~ 50 kHz, fine for 24C02.
-       Layout: PRESC[31:28] SCLDEL[27:16] SDADEL[15:12] SCLH[11:8] SCLL[7:0] */
-    s_hi2c.Init.Timing           = (9U << I2C_TIMINGR_PRESC_Pos) |
-                                   (80U << I2C_TIMINGR_SCLDEL_Pos) |
-                                   (6U << I2C_TIMINGR_SDADEL_Pos) |
-                                   (170U << I2C_TIMINGR_SCLH_Pos) |
-                                   (170U << I2C_TIMINGR_SCLL_Pos);
+    s_hi2c.Init.Timing           = I2C_ComputeTiming(HAL_RCC_GetPCLK1Freq());
     s_hi2c.Init.OwnAddress1      = 0U;
     s_hi2c.Init.AddressingMode   = I2C_ADDRESSINGMODE_7BIT;
     s_hi2c.Init.DualAddressMode  = I2C_DUALADDRESS_DISABLE;
@@ -75,10 +123,21 @@ int32_t EEPROM_Init(void)
 
 static int32_t EEPROM_PollWriteDone(void)
 {
-    /* after each write the chip needs ~5 ms internal cycle;
-       polling ACK is faster and robust, but HAL has no direct API,
-       so use a small delay - perfectly fine at this rate. */
-    HAL_Delay(EEPROM_WRITE_CYCLE_MS);
+    /* The AT24C02 starts its internal write cycle right after the page
+       write; during that cycle it does not ACK. Poll for ACK with a
+       generous timeout instead of a blind fixed delay - this both
+       shortens the wait on fast chips and is safe on slow/cold ones. */
+    uint32_t deadline = HAL_GetTick() + 50U;   /* 50 ms worst case */
+
+    HAL_Delay(1U);   /* let the write cycle at least start */
+    while (HAL_I2C_IsDeviceReady(&s_hi2c, EEPROM_DEV_ADDR, 1, 10U)
+           != HAL_OK)
+    {
+        if (HAL_GetTick() >= deadline)
+        {
+            return -1;   /* device never ACKed - hardware problem */
+        }
+    }
     return 0;
 }
 
@@ -110,7 +169,10 @@ int32_t EEPROM_WriteBytes(uint16_t addr, const uint8_t *data, uint16_t len)
         {
             return -1;
         }
-        EEPROM_PollWriteDone();
+        if (EEPROM_PollWriteDone() != 0)
+        {
+            return -1;   /* write cycle never finished */
+        }
 
         addr += chunk;
         done += chunk;

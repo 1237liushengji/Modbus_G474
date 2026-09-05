@@ -117,11 +117,27 @@ class SlaveSimulator:
                 payload[1 + i // 8] |= 1 << (i % 8)
         return bytes((FC_READ_COILS,)) + bytes(payload)
 
+    # semantic range check, mirrors MB_REG_ValidateConfigValue (firmware)
+    def _validate(self, addr, value):
+        if addr == 0x09 or addr == 0x0A:      # temp/volt limit
+            return value != 0
+        if addr == 0x0B:                       # sample period 10..60000
+            return 10 <= value <= 60000
+        if addr == 0x0C:                       # device mode
+            return value <= 3
+        if addr == 0x0D:                       # slave id 1..247
+            return 1 <= value <= 247
+        if addr == 0x0E:                       # baud idx 0..4 (<=115200)
+            return value <= 4
+        return False
+
     def _write_single(self, req):
         addr = int.from_bytes(req[0:2], "big")
         value = int.from_bytes(req[2:4], "big")
         if addr >= HOLD_COUNT or addr < HOLD_CFG_FIRST:
             return self._exc(FC_WRITE_SINGLE, EX_ILLEGAL_ADDRESS)
+        if not self._validate(addr, value):
+            return self._exc(FC_WRITE_SINGLE, EX_ILLEGAL_VALUE)
         self.holding[addr] = value
         return bytes((FC_WRITE_SINGLE,)) + req
 
@@ -136,5 +152,9 @@ class SlaveSimulator:
         for i in range(qty):
             if not (HOLD_CFG_FIRST <= start + i < HOLD_COUNT):
                 return self._exc(FC_WRITE_MULTI, EX_ILLEGAL_ADDRESS)
+            v = int.from_bytes(req[5 + 2 * i:7 + 2 * i], "big")
+            if not self._validate(start + i, v):
+                return self._exc(FC_WRITE_MULTI, EX_ILLEGAL_VALUE)
+        for i in range(qty):
             self.holding[start + i] = int.from_bytes(req[5 + 2 * i:7 + 2 * i], "big")
         return bytes((FC_WRITE_MULTI,)) + req[0:4]

@@ -54,14 +54,15 @@
 
 /*====================================================================*/
 /* Baudrate table index -> value (40015)                                */
+/*   Valid range 0..4 = 9600..115200. 230400 was removed because the    */
+/*   on-board RS485 transceiver is not rated for it (see docs/03).      */
 /*====================================================================*/
 #define MB_BAUD_IDX_9600          0U
 #define MB_BAUD_IDX_19200         1U
 #define MB_BAUD_IDX_38400         2U
 #define MB_BAUD_IDX_57600         3U
 #define MB_BAUD_IDX_115200        4U
-#define MB_BAUD_IDX_230400        5U
-#define MB_BAUD_IDX_MAX           MB_BAUD_IDX_230400
+#define MB_BAUD_IDX_MAX           MB_BAUD_IDX_115200
 
 uint32_t MB_REG_BaudFromIdx(uint8_t idx);   /* 0 -> default 115200 */
 
@@ -95,6 +96,19 @@ void MB_REG_SetDeviceStatus(uint16_t st);
  *  through MB_REG_SetHolding; the app loop persists it to EEPROM. */
 uint8_t MB_REG_ConfigDirty(void);
 void    MB_REG_ClearConfigDirty(void);
+
+/**
+  * @brief  Semantic range check for a config register write.
+  * @param  addr   config register address (40010..40015)
+  * @param  value  proposed value
+  * @retval 1 valid / 0 rejected
+  * @note   Limits: SlaveID 1..247, BaudIdx 0..4 (9600..115200),
+  *         TempLimit/VoltLimit nonzero, SamplePeriod 10..60000,
+  *         DeviceMode 0..3. Writes outside these ranges would brick the
+  *         node (unreachable slave id / invalid baud), so the protocol
+  *         layer checks this before accepting 0x06/0x10.
+  */
+uint8_t MB_REG_ValidateConfigValue(uint16_t addr, uint16_t value);
 
 /** Default config values used when EEPROM is empty (v0.9+ loads real) */
 uint8_t  MB_REG_GetSlaveId(void);

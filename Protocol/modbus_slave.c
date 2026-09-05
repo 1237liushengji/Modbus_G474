@@ -228,6 +228,13 @@ static void Slave_FC06(const uint8_t *req)
         Slave_SendException(MB_FC_WRITE_SINGLE_REG, MB_EX_ILLEGAL_ADDRESS);
         return;
     }
+    if (MB_REG_ValidateConfigValue(addr, value) == 0U)
+    {
+        /* semantic range violation (e.g. slave id 0 / baud idx >4) -
+           would brick the node, reject with Illegal Data Value */
+        Slave_SendException(MB_FC_WRITE_SINGLE_REG, MB_EX_ILLEGAL_VALUE);
+        return;
+    }
     MB_REG_SetHolding(addr, value);
     /* echo request back */
     Slave_SendOk(MB_FC_WRITE_SINGLE_REG, req, 4U);
@@ -269,6 +276,16 @@ static void Slave_FC10(const uint8_t *req, uint16_t pdu_len)
         {
             Slave_SendException(MB_FC_WRITE_MULTI_REGS, MB_EX_ILLEGAL_ADDRESS);
             return;
+        }
+        /* semantic range check on every value BEFORE writing anything */
+        {
+            uint16_t v = (uint16_t)((req[5 + 2U * i] << 8) | req[6 + 2U * i]);
+            if (MB_REG_ValidateConfigValue((uint16_t)(start + i), v) == 0U)
+            {
+                Slave_SendException(MB_FC_WRITE_MULTI_REGS,
+                                    MB_EX_ILLEGAL_VALUE);
+                return;
+            }
         }
     }
 

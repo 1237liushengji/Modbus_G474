@@ -6,9 +6,14 @@
   *  Design (docs/08-Storage设计.md):
   *   - dedicated log area at the END of the 16 MB flash, LOG_AREA_SIZE bytes
   *   - fixed-size records (LOG_RECORD_SIZE), one sector holds many records
-  *   - a 16-byte header at the area start keeps: magic, write index,
-  *     sequence number and CRC (torn-write recovery -> fallback scan)
-  *   - when full, the oldest sector is erased first (simple wear rotation)
+  *   - headerless on-flash format: every record carries a monotonic 32-bit
+  *     sequence number, so the flash itself is the state - torn writes can
+  *     only lose one record (recovery = scan for first erased record or a
+  *     sequence discontinuity on boot)
+  *   - when full, the sector the write pointer is about to enter is erased
+  *     first (simple rotating ring, even wear-out)
+  *   - a RAM cache keeps the most recent records for fast reads (full
+  *     history can be dumped by the PC tool directly from flash)
   ******************************************************************************
   */
 #ifndef __LOG_H
@@ -30,7 +35,7 @@ typedef struct {
     uint8_t  reserved[LOG_RECORD_SIZE - 12U];
 } log_record_t;
 
-/** Init log subsystem (reads header, locates write position). */
+/** Init log subsystem (scans flash to locate the write position). */
 void LOG_Init(void);
 
 /** Provide the ms tick source (e.g. HAL_GetTick). Call before LOG_Init. */

@@ -63,9 +63,10 @@ static uint16_t s_demo_curr = 125U;    /* 1.25 A */
 /*====================================================================*/
 /* Small numeric formatting (no stdio dependency)                       */
 /*====================================================================*/
-static void U16ToStr(uint32_t v, char *out)
+/* uint32 -> decimal string. tmp sized for the full 32-bit range. */
+static void U32ToStr(uint32_t v, char *out)
 {
-    char tmp[6];
+    char tmp[12];          /* 10 digits max + terminator */
     int i = 0;
 
     if (v == 0U)
@@ -92,11 +93,11 @@ static void U16ToStr1(uint16_t v, char *out)
     uint16_t ip = (uint16_t)(v / 10U);
     uint16_t dp = (uint16_t)(v % 10U);
 
-    U16ToStr(ip, p);
+    U32ToStr(ip, p);
     while (*p) { *out++ = *p++; }
     *out++ = '.';
     p = tmp;
-    U16ToStr(dp, p);
+    U32ToStr(dp, p);
     while (*p) { *out++ = *p++; }
     *out = '\0';
 }
@@ -138,8 +139,8 @@ static void UI_DrawHomeStatic(void)
     char bbuf[8];
     char buf[32];
 
-    U16ToStr(MB_REG_GetSlaveId(), idbuf);
-    U16ToStr(MB_REG_BaudFromIdx((uint8_t)MB_REG_GetBaudIdx()), bbuf);
+    U32ToStr(MB_REG_GetSlaveId(), idbuf);
+    U32ToStr(MB_REG_BaudFromIdx((uint8_t)MB_REG_GetBaudIdx()), bbuf);
 
     LCD_Print(0, 3, "MODBUS SLAVE", LCD_COLOR_WHITE, LCD_COLOR_BLACK);
     buf[0] = 'I'; buf[1] = 'D'; buf[2] = ':'; buf[3] = '\0';
@@ -185,14 +186,14 @@ static void UI_DrawHomeValues(void)
     U16ToStr1(s_demo_curr, buf);   strcat(buf, " A");
     LCD_PrintField(6, 8, buf, 9, LCD_COLOR_WHITE, LCD_COLOR_BLACK);
 
-    U16ToStr(MB_REG_GetHolding(MB_REG_HOLD_RXCNT), idbuf);
-    U16ToStr(MB_REG_GetHolding(MB_REG_HOLD_TXCNT), bbuf);
+    U32ToStr(MB_REG_GetHolding(MB_REG_HOLD_RXCNT), idbuf);
+    U32ToStr(MB_REG_GetHolding(MB_REG_HOLD_TXCNT), bbuf);
     LCD_PrintField(9, 4, idbuf, 6, LCD_COLOR_GREEN, LCD_COLOR_BLACK);
     LCD_PrintField(9, 15, bbuf, 5, LCD_COLOR_GREEN, LCD_COLOR_BLACK);
 
     MB_Slave_GetStats(&st);
-    U16ToStr(st.crc_error_count, idbuf);
-    U16ToStr(st.exception_count, bbuf);
+    U32ToStr(st.crc_error_count, idbuf);
+    U32ToStr(st.exception_count, bbuf);
     LCD_PrintField(10, 5, idbuf, 5, LCD_COLOR_RED, LCD_COLOR_BLACK);
     LCD_PrintField(10, 16, bbuf, 4, LCD_COLOR_RED, LCD_COLOR_BLACK);
 
@@ -228,16 +229,16 @@ static void UI_DrawErrorValues(void)
     comm_stats_t st;
 
     MB_Slave_GetStats(&st);
-    U16ToStr(st.crc_error_count, buf);
+    U32ToStr(st.crc_error_count, buf);
     LCD_PrintField(2, 12, buf, 6, LCD_COLOR_RED, LCD_COLOR_BLACK);
 
-    U16ToStr(st.exception_count, buf);
+    U32ToStr(st.exception_count, buf);
     LCD_PrintField(3, 12, buf, 6, LCD_COLOR_RED, LCD_COLOR_BLACK);
 
-    U16ToStr(MB_REG_GetHolding(MB_REG_HOLD_RXCNT), buf);
+    U32ToStr(MB_REG_GetHolding(MB_REG_HOLD_RXCNT), buf);
     LCD_PrintField(4, 12, buf, 6, LCD_COLOR_WHITE, LCD_COLOR_BLACK);
 
-    U16ToStr(MB_REG_GetHolding(MB_REG_HOLD_ERRCODE), buf);
+    U32ToStr(MB_REG_GetHolding(MB_REG_HOLD_ERRCODE), buf);
     LCD_PrintField(5, 12, buf, 6, LCD_COLOR_YELLOW, LCD_COLOR_BLACK);
 }
 
@@ -267,7 +268,7 @@ static uint16_t CfgStep(uint16_t addr, uint16_t cur)
         case MB_REG_HOLD_VOLT_LIMIT:    return (cur < 2000U) ? (uint16_t)(cur + 50U) : 800U;
         case MB_REG_HOLD_SAMPLE_PERIOD: return (cur < 5000U) ? (uint16_t)(cur + 100U) : 100U;
         case MB_REG_HOLD_SLAVE_ID:      return (cur < 247U)  ? (uint16_t)(cur + 1U)   : 1U;
-        case MB_REG_HOLD_BAUD_IDX:      return (cur < 5U)    ? (uint16_t)(cur + 1U)   : 0U;
+        case MB_REG_HOLD_BAUD_IDX:      return (cur < MB_BAUD_IDX_MAX) ? (uint16_t)(cur + 1U) : 0U;
         default:                        return cur;
     }
 }
@@ -312,7 +313,7 @@ static void UI_DrawConfigValues(void)
         {
             LCD_Print((uint8_t)(2 + i), 0, s_cfg_items[i].name, fg, bg);
         }
-        U16ToStr(val, buf);
+        U32ToStr(val, buf);
         LCD_PrintField((uint8_t)(2 + i), 13, buf, 6, fg, bg);
     }
 }
@@ -543,6 +544,7 @@ void Slave_Main(void)
 static void Slave_ApplyConfigChange(void)
 {
     config_param_t p;
+    static uint32_t s_applied_baud = 0U;   /* baud actually set on the UART */
 
     CONFIG_ReadFromRegisters(&p);
     if (CONFIG_Save(&p))
@@ -556,9 +558,17 @@ static void Slave_ApplyConfigChange(void)
     MB_Slave_SetSlaveId(MB_REG_GetSlaveId());
     {
         uint32_t baud = MB_REG_BaudFromIdx((uint8_t)MB_REG_GetBaudIdx());
-        if (baud != RS485_DEFAULT_BAUDRATE)
+        if (s_applied_baud == 0U)
         {
+            s_applied_baud = RS485_DEFAULT_BAUDRATE;  /* baud set in RS485_Init */
+        }
+        if (baud != s_applied_baud)
+        {
+            /* reprogram the UART even when the new baud equals the default
+               115200 (the old code skipped this, leaving the link dead
+               after switching 9600 -> 115200) */
             BSP_UART_SetBaudrate(baud);
+            s_applied_baud = baud;
         }
         MB_Slave_SetBaudrate(baud);
     }
