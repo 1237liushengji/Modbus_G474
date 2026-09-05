@@ -236,12 +236,24 @@ void LCD_Init(void)
     gpio.Mode  = GPIO_MODE_OUTPUT_PP;
     gpio.Pull  = GPIO_NOPULL;
     gpio.Speed = GPIO_SPEED_FREQ_HIGH;
-    gpio.Pin   = LCD_CS_PIN | LCD_SCL_PIN | LCD_SDA_PIN |
-                 LCD_DC_PIN | LCD_BL_PIN;
+
+    /* NOTE: init each pin on its OWN port. OR-ing all PIN masks together
+       and calling HAL_GPIO_Init on every port would wrongly reconfigure
+       unrelated pins - e.g. PB11 (USART3_RX / RS485!) got clobbered here,
+       which broke slave RX. Each line below configures exactly one pin. */
+    gpio.Pin = LCD_CS_PIN;
     HAL_GPIO_Init(LCD_CS_PORT, &gpio);
+
+    gpio.Pin = LCD_SCL_PIN;
     HAL_GPIO_Init(LCD_SCL_PORT, &gpio);
+
+    gpio.Pin = LCD_SDA_PIN;
     HAL_GPIO_Init(LCD_SDA_PORT, &gpio);
+
+    gpio.Pin = LCD_DC_PIN;
     HAL_GPIO_Init(LCD_DC_PORT, &gpio);
+
+    gpio.Pin = LCD_BL_PIN;
     HAL_GPIO_Init(LCD_BL_PORT, &gpio);
 
     LCD_CS_HIGH();
